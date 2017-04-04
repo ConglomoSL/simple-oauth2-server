@@ -12,6 +12,9 @@ class OAuth2SimpleServer {
         this.securityRoutes = ['/**', '!/' + this.tokenGetPath, '!/' + this.tokenRevocationPath];
         this.init();
     }
+    set securityRoutes(arr) {
+        return arr.push('!/' + this.tokenGetPath, '!/' + this.tokenRevocationPath);
+    }
     init() {
         const routing = this.server;
         appSettings(routing);

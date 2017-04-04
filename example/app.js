@@ -24,7 +24,13 @@ oAuth2.checkPassword = (username, password) => {
     return false;
 }
 
-oAuth2.tokenLifeTime = 5;
+oAuth2.tokenLifeTime = 10;
+
+app.get('/asdasd', (req, res) => {
+    oAuth2.tokenLifeTime = 60;
+    console.log(oAuth2.securityRoutes);
+    res.send(oAuth2.securityRoutes);
+});
 
 app.listen(3000, () => {
     console.log('Server start');
