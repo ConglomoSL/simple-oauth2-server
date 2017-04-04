@@ -1,24 +1,28 @@
 {
-  "name": "simple-oauth2-server",
-  "version": "0.0.1",
-  "description": "Simple oAuth2 server for fast develop",
-  "main": "SoS.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start":"cd example/ && node app.js"
-  },
-  "keywords": [
-    "oauth2"
-  ],
-  "author": "justerest",
-  "license": "ISC",
-  "dependencies": {
-    "body-parser": "^1.17.1",
-    "lowdb": "^0.16.0",
-    "moment": "^2.18.1",
-    "uuid": "^3.0.1"
-  },
-  "devDependencies": {
-    "express": "^4.15.2"
-  }
+    "name": "simple-oauth2-server",
+    "version": "0.0.1",
+    "description": "Simple oAuth2 server for fast develop",
+    "main": "SoS.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "cd example/ && node app.js"
+    },
+    "keywords": [
+        "oauth2"
+    ],
+    "author": "justerest",
+    "license": "ISC",
+    "dependencies": {
+        "body-parser": "^1.17.1",
+        "lowdb": "^0.16.0",
+        "moment": "^2.18.1",
+        "uuid": "^3.0.1",
+        "express": "^4.15.2"
+    },
+    "devDependencies": {        
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/justerest/simple-oauth2-server.git"
+    }
 }
