@@ -2,7 +2,7 @@
   "name": "simple-oauth2-server",
   "version": "0.5.8",
   "description": "Simple oAuth2 server for fast develop",
-  "main": "SoS.js",
+  "main": "$oAuth2$.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "cd example/ && node app.js"

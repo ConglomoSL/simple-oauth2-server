@@ -3,7 +3,9 @@ const app = express();
 const low = require('lowdb');
 const usersData = low('./users.json');
 const secretData = low('./secret-data.json');
-require('./../lib/extend-lowdb.js')(usersData);
+const hasRec_prototype_in_lowdb = require('./../lib/extend-lowdb.js');
+
+hasRec_prototype_in_lowdb(usersData);
 
 usersData.defaults({
     users: [{
@@ -22,38 +24,31 @@ secretData.defaults({
     }]
 }).write();
 
-const SoS = require('./..');
-const oAuth2 = new SoS({
-    checkPassword: (request) => {
-        const {
-            username,
-            password
-        } = request.body;
-        if (username && password) {
-            return usersData.get('users').hasRec({
-                username: username,
-                password: password
-            });
-        }
-        return false;
-    },
-    securityRoutes: ['/**'],
-    controllMethods: ['post', 'delete', 'put'],
-    tokenLifeTime: 10,
-});
+const $oAuth2$ = require('./..');
 
-app.use(oAuth2.init());
+$oAuth2$.checkPassword = (request) => {
+    const {
+        username,
+        password
+    } = request.body;
+    if (username && password) {
+        return usersData.get('users').hasRec({
+            username: username,
+            password: password
+        });
+    }
+    return false;
+}
+
+app.use($oAuth2$.init({
+    securityRoutes: ['/token**', '/secret*'],
+}));
 
 app.get('/secret-data', (req, res) => {
-    // const sss = new SoS({
-    //     controllMethods: ['get']
-    // });
-    // sss.options.controllMethods = ['get'];
-    // app.use(sss.init());
     res.send(secretData.getState());
 });
 
-app.get('/', oAuth2.protect, (req, res) => {
+app.get('/', $oAuth2$.protect, (req, res) => {
     res.send('ok');
 });
 

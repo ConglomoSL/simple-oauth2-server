@@ -4,21 +4,21 @@ const moment = require('moment');
 const appSettings = require('./lib/app-settings.js');
 const tokensDB = require('./lib/create-lowdb.js');
 
-class OAuth2SimpleServer {
-    constructor(options) {
+class SimpleOAuth2Server {
+    init(options) {
         const defaultOptions = {
             tokenGetPath: '/token',
             tokenRevocationPath: '/tokenRevocation',
             tokenLifeTime: 15,
             securityRoutes: ['/secret*'],
             controllMethods: ['get', 'post', 'delete', 'put'],
+            checkPassword: this.checkPassword
         }
         this.options = Object.assign(defaultOptions, options);
         if (typeof this.options.checkPassword !== 'function') {
-            throw Error('Не задана функция проверки пары пользователь/пароль!');
+            throw Error('Не задана функция проверки аутентификации пользователь/пароль!');
+            exit();
         }
-    }
-    init() {
         const router = express.Router();
         const {
             controllMethods
@@ -26,7 +26,6 @@ class OAuth2SimpleServer {
         router.use(appSettings);
         router.use(this._getTokenRoute);
         router.use(this._revocationTokensRoute);
-        // all - не работает
         controllMethods.forEach((method) => {
             router[method](this.options.securityRoutes, this.protect);
         });
@@ -93,4 +92,4 @@ class OAuth2SimpleServer {
     }
 }
 
-module.exports = OAuth2SimpleServer;
+module.exports = new SimpleOAuth2Server;
