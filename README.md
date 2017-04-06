@@ -1,14 +1,15 @@
 # simple-oauth2-server
 ## Usage
 ```
-const $oAuth2$ = require('simple-oauth2-server');
-const protectRouter = $oAuth2$.init({
-  checkPassword: /* your function for authentication */,
-  secretRoutes: ['/secret/*],
-  controlMethods: ['delete','put']
+const simpleOAuth2Server = require('./..');
+
+const protectRouter = simpleOAuth2Server.init({
+    checkPassword: /*your function for authentication*/,
+    routes: ['/secret*'],
+    methods: ['get', 'delete', 'put']
 });
-//include protect router in your app
-app.use(protectRoter);
+
+app.use(protectRouter);
 ```
 ## Example
 You can watch an usage example on https://github.com/justerest/simple-oauth2-server/blob/master/example/app.js

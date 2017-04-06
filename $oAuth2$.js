@@ -5,29 +5,32 @@ const appSettings = require('./lib/app-settings.js');
 const tokensDB = require('./lib/create-lowdb.js');
 
 class SimpleOAuth2Server {
-    init(options) {
+    configuring(config) {
         const defaultOptions = {
+            checkPassword: false, // your function for authentication
+            routes: ['/secret/*'], // protect routes
+            methods: ['get', 'post', 'delete', 'put'], //methods for protect routes
             tokenGetPath: '/token',
             tokenRevocationPath: '/tokenRevocation',
-            tokenLifeTime: 15,
-            securityRoutes: ['/secret*'],
-            controllMethods: ['get', 'post', 'delete', 'put'],
-            checkPassword: this.checkPassword
+            tokenExpired: 24 * 60 * 60, // one day
         }
-        this.options = Object.assign(defaultOptions, options);
-        if (typeof this.options.checkPassword !== 'function') {
+        this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
+        if (typeof this.checkPassword !== 'function') {
             throw Error('Не задана функция проверки аутентификации пользователь/пароль!');
             exit();
         }
+    }
+    init(options) {
+        this.configuring(options);
         const router = express.Router();
         const {
-            controllMethods
-        } = this.options;
+            methods
+        } = this;
         router.use(appSettings);
         router.use(this._getTokenRoute);
         router.use(this._revocationTokensRoute);
-        controllMethods.forEach((method) => {
-            router[method](this.options.securityRoutes, this.protect);
+        methods.forEach((method) => {
+            router[method](this.routes, this.protect);
         });
         return router;
     }
@@ -56,15 +59,15 @@ class SimpleOAuth2Server {
     }
     get _getTokenRoute() {
         const router = express.Router();
-        router.post(this.options.tokenGetPath, (req, res) => {
+        router.post(this.tokenGetPath, (req, res) => {
             const {
                 refresh_token
             } = req.body;
-            if (this.options.checkPassword(req) || this._checkRefreshToken(refresh_token)) {
+            if (this.checkPassword(req) || this._checkRefreshToken(refresh_token)) {
                 const token = {
                     access_token: uuid(),
                     refresh_token: uuid(),
-                    expires_in: this.options.tokenLifeTime,
+                    expires_in: this.tokenExpired,
                     expires_at: moment()
                 };
                 tokensDB.get('tokens').push(token).write();
@@ -78,7 +81,7 @@ class SimpleOAuth2Server {
     }
     get _revocationTokensRoute() {
         const router = express.Router();
-        router.post(this.options.tokenRevocationPath, (req, res) => {
+        router.post(this.tokenRevocationPath, (req, res) => {
             const {
                 token_type_hint,
                 token

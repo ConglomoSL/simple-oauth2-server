@@ -24,9 +24,10 @@ secretData.defaults({
     }]
 }).write();
 
-const $oAuth2$ = require('./..');
+const simpleOAuth2Server = require('./..');
 
-$oAuth2$.checkPassword = (request) => {
+// your function for authentication
+simpleOAuth2Server.checkPassword = function(request) {
     const {
         username,
         password
@@ -40,15 +41,18 @@ $oAuth2$.checkPassword = (request) => {
     return false;
 }
 
-app.use($oAuth2$.init({
-    securityRoutes: ['/token**', '/secret*'],
-}));
+const protectRouter = simpleOAuth2Server.init({ 
+    routes: ['/secret*'],
+    methods: ['get', 'delete', 'put']
+});
+
+app.use(protectRouter);
 
 app.get('/secret-data', (req, res) => {
     res.send(secretData.getState());
 });
 
-app.get('/', $oAuth2$.protect, (req, res) => {
+app.get('/', simpleOAuth2Server.protect, (req, res) => {
     res.send('ok');
 });
 
