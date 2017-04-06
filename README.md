@@ -1,7 +1,7 @@
 # simple-oauth2-server
 ## Usage
 ```
-const simpleOAuth2Server = require('./..');
+const simpleOAuth2Server = require('simple-oauth2-server');
 
 const protectRouter = simpleOAuth2Server.init({
     checkPassword: /*your function for authentication*/,
