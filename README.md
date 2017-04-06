@@ -2,6 +2,8 @@
 ## Introdution
 Simple module for deploying oAuth2 server with several levels of protection.
 Perfect work with <a href="https://github.com/simplabs/ember-simple-auth">`ember-simple-auth`</a>
+
+
 ## Usage
 ```
 npm i --save simple-oauth2-server
@@ -14,7 +16,8 @@ simpleOAuth2Server.init(app, {
     methods: ['get', 'post', 'delete', 'put'], // methods for protect routes
 });
 ```
-You protect is initiate and enabled! And server give tokens by requests on `tokenGetPath`.
+You protection is enabled! And server send tokens by requests on `tokenGetPath`.
+
 ## Default options
 ```
 routes: [], // protect routes
@@ -23,6 +26,7 @@ tokenGetPath: '/token',
 tokenRevocationPath: '/tokenRevocation',
 tokenExpired: 24 * 60 * 60, // one day
 ```
+
 ## Add new layer of protection
 If you need to several levels protection you can add new protect function:
 ```
@@ -37,6 +41,7 @@ $oAuth2$_level2.extend(app, {
     methods: ['get']
 });
 ```
+
 ## Example
 You can watch an usage example on https://github.com/justerest/simple-oauth2-server/blob/master/example/app.js
 Just clone this repository and run `npm i && npm start`

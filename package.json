@@ -1,14 +1,14 @@
 {
   "name": "simple-oauth2-server",
   "version": "0.7.1-beta.3",
-  "description": "Simple oAuth2 server for fast develop",
+  "description": "Simple module for deploying oAuth2 server with several levels of protection. Perfect work with ember-simple-auth",
   "main": "$oAuth2$.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "cd example/ && node app.js"
   },
   "keywords": [
-    "oauth2"
+    "oauth2","bearer","ember-simple-auth","several layers"
   ],
   "author": "justerest",
   "license": "ISC",
