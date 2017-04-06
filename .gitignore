@@ -12,3 +12,4 @@
 /libpeerconnection.log
 npm-debug.log*
 testem.log
+.gitignore

@@ -1,6 +1,6 @@
 {
   "name": "simple-oauth2-server",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "description": "Simple oAuth2 server for fast develop",
   "main": "$oAuth2$.js",
   "scripts": {
