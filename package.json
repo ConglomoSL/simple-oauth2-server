@@ -1,6 +1,6 @@
 {
   "name": "simple-oauth2-server",
-  "version": "0.6.0-beta.8",
+  "version": "0.7.1-beta.3",
   "description": "Simple oAuth2 server for fast develop",
   "main": "$oAuth2$.js",
   "scripts": {
@@ -14,10 +14,10 @@
   "license": "ISC",
   "dependencies": {
     "body-parser": "^1.17.1",
+    "express": "^4.15.2",
     "lowdb": "^0.16.0",
     "moment": "^2.18.1",
-    "uuid": "^3.0.1",
-    "express": "^4.15.2"
+    "uuid": "^3.0.1"
   },
   "devDependencies": {},
   "repository": {

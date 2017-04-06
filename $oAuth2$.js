@@ -5,61 +5,61 @@ const appSettings = require('./lib/app-settings.js');
 const tokensDB = require('./lib/create-lowdb.js');
 
 class SimpleOAuth2Server {
+    constructor() {
+        this.protect = [this._defaultProtect.bind(this)];
+    }
     configuring(config) {
         const defaultOptions = {
             checkPassword: false, // your function for authentication
-            routes: ['/secret/*'], // protect routes
-            methods: ['get', 'post', 'delete', 'put'], //methods for protect routes
+            routes: [], // protect routes
+            methods: [], //methods for protect routes ['get', 'post', 'delete', 'put']
             tokenGetPath: '/token',
             tokenRevocationPath: '/tokenRevocation',
             tokenExpired: 24 * 60 * 60, // one day
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
-        if (typeof this.checkPassword !== 'function') {
-            throw Error('Не задана функция проверки аутентификации пользователь/пароль!');
+    }
+    init(app, options) {
+        if (!app) {
+            throw Error('Where is express application?');
             exit();
         }
-    }
-    init(options) {
         this.configuring(options);
+        if (typeof this.checkPassword !== 'function') {
+            throw Error('Function for checking user/password is undefined!');
+            exit();
+        }
+        app.use(appSettings);
+        app.use(this._getTokenRoute);
+        app.use(this._revocationTokensRoute);
+        app.use(this._loadRoutes);
+    }
+    extend(app, options) {
+        this.configuring(options);
+        app.use(this._loadRoutes);
+    }
+    authorizationHeader(request) {
+        return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+    }
+    addProtect(aFunction) {
+        const newProtect = this;
+        newProtect.protect.push(aFunction);
+        return newProtect;
+    }
+    get _loadRoutes() {
         const router = express.Router();
         const {
             methods
         } = this;
-        router.use(appSettings);
-        router.use(this._getTokenRoute);
-        router.use(this._revocationTokensRoute);
         methods.forEach((method) => {
             router[method](this.routes, this.protect);
         });
         return router;
     }
-    protect(req, res, next) {
-        if (req.get('Authorization')) {
-            const access_token = req.get('Authorization').replace('Bearer ', '');
-            const token = tokensDB.get('tokens').find({
-                access_token: access_token
-            }).value();
-            if (token && moment(token.expires_at).add(token.expires_in, 'seconds') >= moment()) {
-                return next();
-            }
-        }
-        return res.status(401).send({
-            "message": 'Попытка несанкционированного доступа!'
-        });
-    }
-    _checkRefreshToken(refresh_token) {
-        if (refresh_token && tokensDB.get('tokens').hasRec('refresh_token', refresh_token)) {
-            tokensDB.get('tokens').remove({
-                refresh_token: refresh_token
-            }).write();
-            return true;
-        }
-        return false;
-    }
     get _getTokenRoute() {
-        const router = express.Router();
-        router.post(this.tokenGetPath, (req, res) => {
+        return express.Router().post(this.tokenGetPath, authentication.bind(this));
+
+        function authentication(req, res) {
             const {
                 refresh_token
             } = req.body;
@@ -74,14 +74,14 @@ class SimpleOAuth2Server {
                 return res.send(token);
             }
             return res.status(401).send({
-                "message": "error!"
+                "message": "Ошибка аутентификации!"
             });
-        });
-        return router;
+        }
     }
     get _revocationTokensRoute() {
-        const router = express.Router();
-        router.post(this.tokenRevocationPath, (req, res) => {
+        return express.Router().post(this.tokenRevocationPath, deleteTokens);
+
+        function deleteTokens(req, res) {
             const {
                 token_type_hint,
                 token
@@ -90,8 +90,39 @@ class SimpleOAuth2Server {
                 [token_type_hint]: token
             }).write();
             res.send();
+        }
+    }
+    _defaultProtect(req, res, next) {
+        const access_token = this.authorizationHeader(req);
+        if (access_token) {
+            const token = tokensDB.get('tokens').find({
+                access_token: access_token
+            }).value();
+            if (validateToken(token)) {
+                req.token = token;
+                return next();
+            }
+        }
+        return res.status(401).send({
+            "message": 'Попытка несанкционированного доступа!'
         });
-        return router;
+
+        function validateToken(token) {
+            return token && moment(token.expires_at).add(token.expires_in, 'seconds') >= moment();
+        }
+    }
+    _checkRefreshToken(refresh_token) {
+        if (isTokenInDB(refresh_token)) {
+            tokensDB.get('tokens').remove({
+                refresh_token: refresh_token
+            }).write();
+            return true;
+        }
+        return false;
+
+        function isTokenInDB(refresh_token) {
+            return refresh_token && tokensDB.get('tokens').hasRec('refresh_token', refresh_token);
+        }
     }
 }
 
