@@ -18,7 +18,7 @@ const app = express();
 
 const simpleOAuth2Server = require('simple-oauth2-server');
 simpleOAuth2Server.init(app, {    
-    checkPassword: (request) => { // your function for authentication (must return `true` or `false`)
+    checkPassword: function(request) { // your function for authentication (must return `true` or `false`)
         const {username, password} = request.body;
         if(username === 'user' && password === 'pass'){
           return true;
@@ -77,10 +77,10 @@ app.get('/secret-data', (req, res) => {
     res.send(/* secret data */);
 });
 ```
-You can add information to tokens if you specify a function in the `tokenExtend` option when  initializing or extending
+You can add information to tokens if you specify a function in the `tokenExtend` option when  initializing
 ```javascript
 simpleOAuth2Server.init(app, {    
-    checkPassword: (request) => { // your function for authentication (must return `true` or `false`)
+    checkPassword: function(request) { // your function for authentication (must return `true` or `false`)
         const {username, password} = request.body;
         if(username === 'user' && password === 'pass'){
           return true;
