@@ -51,7 +51,7 @@ const $oAuth2$_newLayer = $oAuth2$.addProtect(checkUserRights);
 ```
 And extend protection for other routes (you can send only `routes`, `methods` and `authorizationHeader` in options)
 ```javascript
-$oAuth2$_newLayer.extend(app, {
+$oAuth2$_newLayer.extend({
     routes: ['/secret*'],
     methods: ['get']
 });
