@@ -33,38 +33,70 @@ You protection is enabled! And server send tokens on requests on `tokenGetPath`.
 
 ## Default options
 ```javascript
-routes: [], // protect routes
-methods: [], // methods for protect routes ['get', 'post', 'delete', 'put'] (except 'any')
-tokenExpired: 24 * 60 * 60, // one day
-tokenGetPath: '/token',
-tokenRevocationPath: '/tokenRevocation',
-
-// function for extraction access token from header (must return access token value)
-// by default сonfigured for Bearer tokens
-authorizationHeader: function(request) {
-    return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+{
+  /**
+    @function Your function for issuing tokens
+    @default undefined
+    @param request
+  **/
+  checkPassword: /* required declare */,
+  /**
+    @property Protected routes
+    @default []
+    @type array
+  **/
+  routes: [],
+  /**
+    @property Methods for protected routes ['get', 'post', 'delete', 'put'] (except 'any')
+    @default []
+    @type array
+  **/
+  methods: [],
+  /**
+    @property Token lifetime
+    @default one day
+    @type integer
+  **/
+  tokenExpired: 24 * 60 * 60,
+  /**
+    @property Route where server issues tokens
+    @default '/token'
+    @type string
+  **/
+  tokenGetPath: '/token',
+  /**
+    @property Route where server revokes tokens
+    @default '/token'
+    @type string
+  **/
+  tokenRevocationPath: '/tokenRevocation',
+  /**
+    @function Function for extraction access token from headers (must return value of access token)
+    @default сonfigured for Bearer tokens
+    @param request
+  **/
+  authorizationHeader: function(request) {
+      return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+  }
 }
 ```
 
 ## Add new layer of protection
-If you need to several levels protection you can add new protect function:
+If you need to several levels protection you can add new protect function and extend protection for other routes:
 ```javascript
-const newLayer = simpleOAuth2Server.addProtect(checkUserRights);
-```
-And extend protection for other routes (you can send only `routes`, `methods` and `authorizationHeader` in options)
-```javascript
-newLayer.extend({
-    routes: ['/secret*'],
-    methods: ['get']
-});
+simpleOAuth2Server.addProtect(checkUserRights)
+  .extend({
+      routes: ['/secret*'],
+      methods: ['get']
+  });
 ```
 You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection.
 ```javascript
-const superProtectLayer = newLayer.addProtect(isSuperAdmin);
+const superProtectLayer = simpleOAuth2Server.addProtect(isSuperAdmin).addProtect(checkUserRights).protect;
 ```
 You can add layer of protection as middleware in route instead extending
 ```javascript
-app.get('/only/super/users/can/read', superProtectLayer.protect, (req, res) => {
+app.get('/only/super/users/can/read', superProtectLayer, (req, res) => {
     res.send('you super!');
 });
 ```

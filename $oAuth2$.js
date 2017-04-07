@@ -10,7 +10,6 @@ class SimpleOAuth2Server {
     }
     configuring(config) {
         const defaultOptions = {
-            checkPassword: false, // your function for authentication
             routes: [], // protect routes
             methods: [], //methods for protect routes ['get', 'post', 'delete', 'put']
             tokenExpired: 24 * 60 * 60, // one day
@@ -25,7 +24,7 @@ class SimpleOAuth2Server {
             exit();
         }
         this.configuring(options);
-        if (typeof this.checkPassword !== 'function') {
+        if (!this.checkPassword) {
             throw Error('Function for checking user/password is undefined!');
             exit();
         }
@@ -34,10 +33,12 @@ class SimpleOAuth2Server {
         app.use(this._revocationTokensRoute);
         app.use(this._loadRoutes);
         this.expressApp = app;
+        return this;
     }
     extend(options) {
         this.configuring(options);
         this.expressApp.use(this._loadRoutes);
+        return this;
     }
     authorizationHeader(request) {
         return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
@@ -75,6 +76,7 @@ class SimpleOAuth2Server {
                 return res.send(token);
             }
             return res.status(401).send({
+                // Message for russian hackers!
                 "message": "Ошибка аутентификации!"
             });
         }
