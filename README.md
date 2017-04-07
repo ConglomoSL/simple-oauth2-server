@@ -1,3 +1,5 @@
+[![npm version](https://badge.fury.io/js/simple-oauth2-server.svg)](http://badge.fury.io/js/simple-oauth2-server)
+
 # simple-oauth2-server
 ## Introdution
 Simple module for deploying oAuth2 server with several levels of protection.
@@ -57,6 +59,16 @@ And extend protection for other routes (you can send only `routes`, `methods` an
 $oAuth2$_newLayer.extend(app, {
     routes: ['/secret*'],
     methods: ['get']
+});
+```
+You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection.
+```
+const superLevel = $oAuth2$_newLayer.addProtect(isSuperAdmin);
+```
+You can add layer of protection as middleware in route instead extending
+```
+app.get('/only/super/users/can/read', superLevel.protect, (req, res) => {
+    res.send('you super!');
 });
 ```
 
