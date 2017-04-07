@@ -67,6 +67,34 @@ app.get('/only/super/users/can/read', superLevel.protect, (req, res) => {
 });
 ```
 
+## Token format
+On protect routes you can get token info from `req.token`
+```javascript
+app.get('/secret-data', (req, res) => {
+    console.log(req.token);
+    res.send(secretData.getState());
+});
+```
+You can add information in tokens if set function in option tokenExtend:
+```javascript
+tokenExtend: function(request) { // function must return `object` with new fields or `false`
+  return {
+    username: request.body.user
+  };
+}
+````
+
+### Default information in token (not re-written)
+```javascript
+{
+    access_token: uuid(),
+    refresh_token: uuid(),
+    expires_in: this.tokenExpired,
+    expires_at: moment()
+}
+
+```
+
 ## Example
 You can watch an usage example on https://github.com/justerest/simple-oauth2-server/blob/master/example/app.js
 

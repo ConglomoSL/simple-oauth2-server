@@ -65,12 +65,12 @@ class SimpleOAuth2Server {
                 refresh_token
             } = req.body;
             if (this.checkPassword(req) || this._checkRefreshToken(refresh_token)) {
-                const token = {
+                const token = Object.assign(this.tokenExtend(req) || {}, {
                     access_token: uuid(),
                     refresh_token: uuid(),
                     expires_in: this.tokenExpired,
                     expires_at: moment()
-                };
+                });
                 tokensDB.get('tokens').push(token).write();
                 return res.send(token);
             }

@@ -37,7 +37,11 @@ $oAuth2$.init(app, {
     tokenExpired: 24 * 60 * 60, // one day
     tokenGetPath: '/token',
     tokenRevocationPath: '/tokenRevocation',
-
+    tokenExtend: function(request) { // you can include in token more information from request (must return `object` or `false`)
+      return {
+        username: request.body.user
+      };
+    },
     // function for extraction access token from header (must return access token value)
     // by default сonfigured for Bearer tokens
     authorizationHeader: function(request) {
