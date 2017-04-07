@@ -5,6 +5,8 @@
 Simple module for deploying oAuth2 server with several levels of protection.
 Perfect work with <a href="https://github.com/simplabs/ember-simple-auth">`ember-simple-auth`</a>
 
+It use <a href="https://github.com/typicode/lowdb">`lowdb`</a> for saving tokens from the box.
+
 
 ## Basic usage
 ```
@@ -47,44 +49,53 @@ authorizationHeader: function(request) {
 ## Add new layer of protection
 If you need to several levels protection you can add new protect function:
 ```javascript
-const $oAuth2$_newLayer = $oAuth2$.addProtect(checkUserRights);
+const newLayer = simpleOAuth2Server.addProtect(checkUserRights);
 ```
 And extend protection for other routes (you can send only `routes`, `methods` and `authorizationHeader` in options)
 ```javascript
-$oAuth2$_newLayer.extend({
+newLayer.extend({
     routes: ['/secret*'],
     methods: ['get']
 });
 ```
 You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection.
 ```javascript
-const superLevel = $oAuth2$_newLayer.addProtect(isSuperAdmin);
+const superProtectLayer = newLayer.addProtect(isSuperAdmin);
 ```
 You can add layer of protection as middleware in route instead extending
 ```javascript
-app.get('/only/super/users/can/read', superLevel.protect, (req, res) => {
+app.get('/only/super/users/can/read', superProtectLayer.protect, (req, res) => {
     res.send('you super!');
 });
 ```
 
-## Token format
+## Token info
 On protect routes you can get token info from `req.token`
 ```javascript
 app.get('/secret-data', (req, res) => {
     console.log(req.token);
-    res.send(secretData.getState());
+    res.send(/* secret data */);
 });
 ```
-You can add information in tokens if set function in option tokenExtend:
+You can add information to tokens if you specify a function in the `tokenExtend` option when  initializing or extending
 ```javascript
-tokenExtend: function(request) { // function must return `object` with new fields or `false`
-  return {
-    username: request.body.user
-  };
-}
+simpleOAuth2Server.init(app, {    
+    checkPassword: (request) => { // your function for authentication (must return `true` or `false`)
+        const {username, password} = request.body;
+        if(username === 'user' && password === 'pass'){
+          return true;
+        }
+        return false;
+      },    
+    tokenExtend: function(request) { // function must return `object` with new fields or `false`
+      return {
+        username: request.body.username
+      };
+    }
+});
 ````
 
-### Default information in token (not re-written)
+Default information in token (not re-written)
 ```javascript
 {
     access_token: uuid(),
