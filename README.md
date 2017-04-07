@@ -66,7 +66,7 @@ You protection is enabled! And server send tokens on requests on `tokenGetPath`.
   tokenGetPath: '/token',
   /**
     @property Route where server revokes tokens
-    @default '/token'
+    @default '/tokenRevocation'
     @type string
   **/
   tokenRevocationPath: '/tokenRevocation',
@@ -90,12 +90,9 @@ simpleOAuth2Server.addProtect(checkUserRights)
       methods: ['get']
   });
 ```
-You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection.
+You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection. And you can add layer of protection as middleware in route instead extending:
 ```javascript
 const superProtectLayer = simpleOAuth2Server.addProtect(isSuperAdmin).addProtect(checkUserRights).protect;
-```
-You can add layer of protection as middleware in route instead extending
-```javascript
 app.get('/only/super/users/can/read', superProtectLayer, (req, res) => {
     res.send('you super!');
 });
@@ -112,18 +109,22 @@ app.get('/secret-data', (req, res) => {
 You can add information to tokens if you specify a function in the `tokenExtend` option when  initializing
 ```javascript
 simpleOAuth2Server.init(app, {    
-    checkPassword: function(request) { // your function for authentication (must return `true` or `false`)
-        const {username, password} = request.body;
-        if(username === 'user' && password === 'pass'){
-          return true;
-        }
-        return false;
-      },    
-    tokenExtend: function(request) { // function must return `object` with new fields or `false`
-      return {
-        username: request.body.username
-      };
+  checkPassword: function(request) { // your function for authentication (must return `true` or `false`)
+    const {username, password} = request.body;
+    if(username === 'user' && password === 'pass'){
+      return true;
     }
+    return false;
+  },  
+  /**
+    @function Your function for configuring token format
+    @param request
+  **/  
+  tokenExtend: function(request) {
+    return {
+      username: request.body.username
+    };
+  }
 });
 ````
 
