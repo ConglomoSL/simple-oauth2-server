@@ -13,9 +13,9 @@ class SimpleOAuth2Server {
             checkPassword: false, // your function for authentication
             routes: [], // protect routes
             methods: [], //methods for protect routes ['get', 'post', 'delete', 'put']
+            tokenExpired: 24 * 60 * 60, // one day
             tokenGetPath: '/token',
             tokenRevocationPath: '/tokenRevocation',
-            tokenExpired: 24 * 60 * 60, // one day
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
@@ -33,10 +33,11 @@ class SimpleOAuth2Server {
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
         app.use(this._loadRoutes);
+        this.expressApp = app;
     }
-    extend(app, options) {
+    extend(options) {
         this.configuring(options);
-        app.use(this._loadRoutes);
+        this.expressApp.use(this._loadRoutes);
     }
     authorizationHeader(request) {
         return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
