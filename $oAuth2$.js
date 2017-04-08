@@ -11,10 +11,10 @@ class SimpleOAuth2Server {
     configuring(config) {
         const defaultOptions = {
             routes: [], // protect routes
-            methods: [], //methods for protect routes ['get', 'post', 'delete', 'put']
+            methods: [], // methods for protect routes ['get', 'post', 'delete', 'put']
             tokenExpired: 24 * 60 * 60, // one day
             tokenGetPath: '/token',
-            tokenRevocationPath: '/tokenRevocation',
+            tokenRevocationPath: '/tokenRevocation'
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
@@ -31,7 +31,6 @@ class SimpleOAuth2Server {
         app.use(appSettings);
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
-        app.use(this._loadRoutes);
         this.expressApp = app;
         return this;
     }
@@ -44,9 +43,14 @@ class SimpleOAuth2Server {
         return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
     }
     addProtect(aFunction) {
-        const newProtect = this;
-        newProtect.protect.push(aFunction);
-        return newProtect;
+        const self = this;
+        self.protect.push(aFunction);
+        return self;
+    }
+    clearProtects() {
+        const self = this;
+        self.protect = [this._defaultProtect.bind(this)];
+        return self;
     }
     get _loadRoutes() {
         const router = express.Router();

@@ -15,21 +15,29 @@ npm i --save simple-oauth2-server
 ```javascript
 const express = require('express');
 const app = express();
-
 const simpleOAuth2Server = require('simple-oauth2-server');
-simpleOAuth2Server.init(app, {    
-    checkPassword: function(request) { // your function for authentication (must return `true` or `false`)
-        const {username, password} = request.body;
-        if(username === 'user' && password === 'pass'){
-          return true;
+
+simpleOAuth2Server
+    .init(app, {
+        // your function for authentication (must return `true` or `false`)
+        checkPassword: function(request) {
+            const {
+                username,
+                password
+            } = request.body;
+            if (username === 'user' && password === 'pass') {
+                return true;
+            }
+            return false;
         }
-        return false;
-      },    
-    routes: ['/secret'], // routes which you want to protect    
-    methods: ['get', 'post', 'delete', 'put'] // methods for protect routes
-});
+    })
+    .extend({
+        routes: ['/secret'], // routes which you want to protect
+        methods: ['get', 'post', 'delete', 'put'] // methods for protective routes
+    });
 ```
-You protection is enabled! And server send tokens on requests on `tokenGetPath`.
+Your protection is enabled! And server send tokens on requests on `tokenGetPath`.
+
 
 ## Default options
 ```javascript
@@ -59,6 +67,16 @@ You protection is enabled! And server send tokens on requests on `tokenGetPath`.
   **/
   tokenExpired: 24 * 60 * 60,
   /**
+  @function Your function for configuring token format
+  @default undefined
+  @param request
+  **/  
+  tokenExtend: function(request) {
+    return {
+      username: request.body.username
+    };
+  }
+  /**
     @property Route where server issues tokens
     @default '/token'
     @type string
@@ -81,23 +99,6 @@ You protection is enabled! And server send tokens on requests on `tokenGetPath`.
 }
 ```
 
-## Add new layer of protection
-If you need to several levels protection you can add new protect function and extend protection for other routes:
-```javascript
-simpleOAuth2Server.addProtect(checkUserRights)
-  .extend({
-      routes: ['/secret*'],
-      methods: ['get']
-  });
-```
-You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection. And you can add layer of protection as middleware in route instead extending:
-```javascript
-const superProtectLayer = simpleOAuth2Server.addProtect(isSuperAdmin).addProtect(checkUserRights).protect;
-app.get('/only/super/users/can/read', superProtectLayer, (req, res) => {
-    res.send('you super!');
-});
-```
-
 ## Token info
 On protect routes you can get token info from `req.token`
 ```javascript
@@ -106,27 +107,6 @@ app.get('/secret-data', (req, res) => {
     res.send(/* secret data */);
 });
 ```
-You can add information to tokens if you specify a function in the `tokenExtend` option when  initializing
-```javascript
-simpleOAuth2Server.init(app, {    
-  checkPassword: function(request) { // your function for authentication (must return `true` or `false`)
-    const {username, password} = request.body;
-    if(username === 'user' && password === 'pass'){
-      return true;
-    }
-    return false;
-  },  
-  /**
-    @function Your function for configuring token format
-    @param request
-  **/  
-  tokenExtend: function(request) {
-    return {
-      username: request.body.username
-    };
-  }
-});
-````
 
 Default information in token (not re-written)
 ```javascript
@@ -137,6 +117,83 @@ Default information in token (not re-written)
     expires_at: moment()
 }
 
+```
+
+## Add new layer of protection
+If you need to several levels protection you can add new protect function and extend protection for other routes:
+```javascript
+simpleOAuth2Server
+    .addProtect(checkUserRights)
+    .extend({
+        routes: ['/secret*'],
+        methods: ['get']
+    });
+```
+
+You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection. And you can add layer of protection as middleware in route instead extending:
+```javascript
+const superProtect = simpleOAuth2Server
+    .addProtect(isSuperAdmin)
+    .addProtect(checkUserRights)
+    .protect;
+
+app.get('/only/super/users/can/read', superProtect, (req, res) => {
+    res.send('You are super!');
+});
+```
+
+## Full usage
+```javascript
+simpleOAuth2Server
+    // Let's start issuing tokens
+    .init(app, {
+        checkPassword: authenticationCheck, // Your function for issuing tokens (required)
+        tokenExpired: 24 * 60 * 60, // one day by default
+        tokenGetPath: '/token',
+        tokenRevocationPath: '/tokenRevocation',
+        // Your function for configuring token format if it's needed
+        tokenExtend: function(request) {
+            return {
+                username: request.body.username
+            };
+        },
+        // Function for extraction access token from headers (must return value of access token)
+        // Configured for Bearer tokens by default
+        authorizationHeader: function(request) {
+            return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+        }
+    })
+    // Enable protection on routes (access only for authenticated users)
+    .extend({
+        // routes which you want to protect, example: ['/secret/documents', '/secret-images/**']
+        routes: ['/comments/'],
+        // methods for protect routes, example (except 'any'): ['get', 'post', 'delete', 'put']
+        methods: ['post']
+    })
+    // Add new protective layer for some routes
+    .addProtect(checkAccess)
+    // Access only for authorized users
+    .extend({
+        routes: ['/posts/'],
+        methods: ['post']
+    })
+    .extend({
+        routes: ['/posts/:post_id'],
+        methods: ['put', 'get', 'delete']
+    })
+    // Remove all previous levels of protection (function checkAccess in this example)
+    .clearProtects()
+    // Add new protective layer for some routes
+    .addProtect(isAdmin)
+    // Access only for administator
+    .extend({
+        routes: ['/users/'],
+        methods: ['post']
+    })
+    .extend({
+        routes: ['/users/:post_id'],
+        methods: ['delete']
+    });
 ```
 
 ## Example

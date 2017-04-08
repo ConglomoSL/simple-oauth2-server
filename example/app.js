@@ -24,30 +24,59 @@ secretData.defaults({
     }]
 }).write();
 
+// Include simple oAuth2 server and start DB in /secretLocalDataBase
 const simpleOAuth2Server = require('./..');
 
-simpleOAuth2Server.init(app, {
-        checkPassword: authenticationCheck, // Your function for issuing tokens
-        routes: ['**'], // routes which you want to protect, example: ['/secret/documents', '/secret-images/**']
-        methods: ['get'], //methods for protect routes, example: ['get', 'post', 'delete', 'put'] (except 'any')
+simpleOAuth2Server
+    // Let's start issuing tokens
+    .init(app, {
+        checkPassword: authenticationCheck, // Your function for issuing tokens (required)
+        tokenExpired: 24 * 60 * 60, // one day by default
+        tokenGetPath: '/token',
+        tokenRevocationPath: '/tokenRevocation',
+        // Your function for configuring token format if it's needed
+        tokenExtend: function(request) {
+            return {
+                username: request.body.username
+            };
+        },
+        // Function for extraction access token from headers (must return value of access token)
+        // Configured for Bearer tokens by default
+        authorizationHeader: function(request) {
+            return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+        }
     })
-    .addProtect(isAdmin)
+    // Enable protection on routes (access only for authenticated users)
     .extend({
-        routes: ['/posts**'],
-        methods: ['post', 'delete', 'put']
+        // routes which you want to protect, example: ['/secret/documents', '/secret-images/**']
+        routes: ['/secret-data/'],
+        // methods for protect routes, example (except 'any'): ['get', 'post', 'delete', 'put']
+        methods: ['get', 'post']
+    })
+    // Add new protective layer for some routes
+    .addProtect(checkAccess)
+    // Access only for authorized users
+    .extend({
+        routes: ['/posts/'],
+        methods: ['post']
+    })
+    .extend({
+        routes: ['/posts/:post_id'],
+        methods: ['put', 'get', 'delete']
+    })
+    // Remove all previous levels of protection (function checkAccess in this example)
+    .clearProtects()
+    // Add new protective layer for some routes
+    .addProtect(isAdmin)
+    // Access only for administator
+    .extend({
+        routes: ['/users/'],
+        methods: ['post']
+    })
+    .extend({
+        routes: ['/users/:post_id'],
+        methods: ['delete']
     });
-
-// Great! Your protection is enabled! And server send tokens on requests on `tokenGetPath` (default '/token').
-// In this example all authenticated users can make GET requests on all ('**') routes.
-// Admin can make POST, DELETE and PUT requests.
-
-// You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection.
-const superLevel = simpleOAuth2Server.addProtect(isAdmin).protect;
-
-// You can add layer of protection as middleware in route
-app.get('/only/super/users/can/read', superLevel, (req, res) => {
-    res.send('You are super!');
-});
 
 // On protect routes you can get token info from `req.token`
 app.get('/secret-data', (req, res) => {
@@ -65,6 +94,7 @@ function authenticationCheck(request) {
         password
     } = request.body;
     if (username && password) {
+        /* If user is in DB and password is matches then return true */
         return usersData.get('users').hasRec({
             username: username,
             password: password
@@ -73,7 +103,13 @@ function authenticationCheck(request) {
     return false;
 }
 
-function isAdmin(req, res, next) {
-    // if admin go to next
-    next();
+function checkAccess(req, res, next) {
+    if ( /* have access then */ true) {
+        next();
+    } else res.status(401).send('Don`t have access!')
 }
+
+function isAdmin(req, res, next) {
+    // Если администратор, то идём дальше
+    next();
+};
