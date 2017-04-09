@@ -205,3 +205,8 @@ git clone https://github.com/justerest/simple-oauth2-server.git
 cd /simple-oauth2-server
 npm i && npm start
 ```
+
+## Have questions or problems?
+You can send me message on justerest@yandex.ru or create an issue.
+I'm glad to listen any questions, criticism and suggestions.
+
