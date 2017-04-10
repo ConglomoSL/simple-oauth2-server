@@ -28,7 +28,7 @@ secretData.defaults({
 const simpleOAuth2Server = require('./..');
 
 simpleOAuth2Server
-    // Let's start issuing tokens
+    // Let's start session
     .init(app, {
         checkPassword: authenticationCheck, // Your function for issuing tokens (required)
         tokenExpired: 24 * 60 * 60, // one day by default
@@ -46,34 +46,33 @@ simpleOAuth2Server
             return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
         }
     })
-    // Enable protection on routes (access only for authenticated users)
-    .extend({
-        // routes which you want to protect, example: ['/secret/documents', '/secret-images/**']
+    // Enable protection on routes (access only for authenticated users in this example)
+    .defend({
+        // routes which you want to protect
         routes: ['/secret-data/'],
-        // methods for protect routes, example (except 'any'): ['get', 'post', 'delete', 'put']
+        // methods for routes protection (except 'any')
         methods: ['get', 'post']
     })
-    // Add new protective layer for some routes
-    .addProtect(checkAccess)
-    // Access only for authorized users
-    .extend({
+    // Add new protective layer for some routes (checkAccess = function(req, res, next) {})
+    .add(checkAccess)
+    .defend({
         routes: ['/posts/'],
         methods: ['post']
     })
-    .extend({
+    .defend({
         routes: ['/posts/:post_id'],
         methods: ['put', 'get', 'delete']
     })
     // Remove all previous levels of protection (function checkAccess in this example)
-    .clearProtects()
+    .reset()
     // Add new protective layer for some routes
-    .addProtect(isAdmin)
+    .add(isAdmin)
     // Access only for administator
-    .extend({
+    .defend({
         routes: ['/users/'],
         methods: ['post']
     })
-    .extend({
+    .defend({
         routes: ['/users/:post_id'],
         methods: ['delete']
     });
@@ -104,8 +103,8 @@ function authenticationCheck(request) {
 }
 
 function checkAccess(req, res, next) {
-    if ( /* have access then */ true) {
-        next();
+    if (true) {
+        next(); /* if have access then next() */
     } else res.status(401).send('Don`t have access!')
 }
 

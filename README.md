@@ -5,7 +5,7 @@
 Simple module for deploying oAuth2 server with several levels of protection.
 Perfect work with <a href="https://github.com/simplabs/ember-simple-auth">`ember-simple-auth`</a>
 
-It use <a href="https://github.com/typicode/lowdb">`lowdb`</a> for saving tokens from the box.
+It use <a href="https://github.com/typicode/lowdb">`lowdb`</a> for saving tokens in session.
 
 
 ## Basic usage
@@ -17,98 +17,81 @@ const express = require('express');
 const app = express();
 const simpleOAuth2Server = require('simple-oauth2-server');
 
-simpleOAuth2Server
-    .init(app, {
-        // your function for authentication (must return `true` or `false`)
-        checkPassword: function(request) {
-            const {
-                username,
-                password
-            } = request.body;
-            if (username === 'user' && password === 'pass') {
-                return true;
-            }
-            return false;
+simpleOAuth2Server.init(app, {
+    // your function for authentication (must return `true` or `false`)
+    checkPassword: function(request) {
+        const {
+            username,
+            password
+        } = request.body;
+        if (username === 'user' && password === 'pass') {
+            return true;
         }
-    })
-    .extend({
-        routes: ['/secret'], // routes which you want to protect
-        methods: ['get', 'post', 'delete', 'put'] // methods for protective routes
-    });
+        return false;
+    }
+});
+simpleOAuth2Server.defend({
+    routes: ['/secret'], // routes which you want to protect
+    methods: ['get', 'post', 'delete', 'put'] // methods for protective routes
+});
 ```
-Your protection is enabled! And server send tokens on requests on `tokenGetPath`.
+Your protection is enabled! And server send tokens on requests on `tokenGetPath` (by default '/token').
 
 
-## Default options
+## Methods of simpleOAuth2Server object
+### init(app, options)
+It start session.
+Params:
+- app
+  - your express application object
+- options (type: `object`):
 ```javascript
 {
-  /**
-    @function Your function for issuing tokens
-    @default undefined
-    @param request
-  **/
   checkPassword: /* required declare */,
-  /**
-    @property Protected routes
-    @default []
-    @type array
-  **/
-  routes: [],
-  /**
-    @property Methods for protected routes ['get', 'post', 'delete', 'put'] (except 'any')
-    @default []
-    @type array
-  **/
-  methods: [],
-  /**
-    @property Token lifetime
-    @default one day
-    @type integer
-  **/
-  tokenExpired: 24 * 60 * 60,
-  /**
-  @function Your function for configuring token format
-  @default undefined
-  @param request
-  **/  
+  tokenExpired: 24 * 60 * 60, // token lifetime
+  tokenGetPath: '/token', // route where server gives tokens
+  tokenRevocationPath: '/tokenRevocation', // route where server revokes tokens
+
+  // Function for configuring token format if it`s needed (argument is request)
   tokenExtend: function(request) {
     return {
       username: request.body.username
     };
   }
-  /**
-    @property Route where server issues tokens
-    @default '/token'
-    @type string
-  **/
-  tokenGetPath: '/token',
-  /**
-    @property Route where server revokes tokens
-    @default '/tokenRevocation'
-    @type string
-  **/
-  tokenRevocationPath: '/tokenRevocation',
-  /**
-    @function Function for extraction access token from headers (must return value of access token)
-    @default сonfigured for Bearer tokens
-    @param request
-  **/
+  // Function for extraction access token from headers (must return value of access token)
+  // Configured for Bearer tokens by default
   authorizationHeader: function(request) {
       return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
   }
 }
 ```
 
+### defend(options)
+It establishes protection on routes.
+Options:
+- routes:
+  - type: `array`
+  - default: `[]`
+- methods:
+  - type: `array`
+  - default: `[]`
+
+## add(function(req, res, next))
+Add new middleware function for protection in chain.
+
+## reset()
+Removes middleware functions which was added in the chain.
+
 ## Token info
-On protect routes you can get token info from `req.token`
+On protected routes you can get token info from `req.token`
 ```javascript
 app.get('/secret-data', (req, res) => {
     console.log(req.token);
-    res.send(/* secret data */);
+    res.send('secret data');
 });
 ```
 
-Default information in token (not re-written)
+Default information in token (can not be re-written)
 ```javascript
 {
     access_token: uuid(),
@@ -120,21 +103,27 @@ Default information in token (not re-written)
 ```
 
 ## Add new layer of protection
-If you need to several levels protection you can add new protect function and extend protection for other routes:
+If you need to several levels protection you can add new protect function and defend other routes:
 ```javascript
+const newLayer = simpleOAuth2Server.addProtect(checkUserRights);
+newLayer.defend({
+      routes: ['/secret*'],
+      methods: ['get']
+  });
+// or it can be written like chain:
 simpleOAuth2Server
     .addProtect(checkUserRights)
-    .extend({
+    .defend({
         routes: ['/secret*'],
         methods: ['get']
     });
 ```
 
-You can combine many layers of protection for your application. Make joint layers and layers with unique function of protection. And you can add layer of protection as middleware in route instead extending:
+You can combine many layers of protection for your application. And you can add layer of protection as middleware in route:
 ```javascript
 const superProtect = simpleOAuth2Server
-    .addProtect(isSuperAdmin)
     .addProtect(checkUserRights)
+    .addProtect(isSuperAdmin)
     .protect;
 
 app.get('/only/super/users/can/read', superProtect, (req, res) => {
@@ -145,7 +134,7 @@ app.get('/only/super/users/can/read', superProtect, (req, res) => {
 ## Full usage
 ```javascript
 simpleOAuth2Server
-    // Let's start issuing tokens
+    // Let's start session
     .init(app, {
         checkPassword: authenticationCheck, // Your function for issuing tokens (required)
         tokenExpired: 24 * 60 * 60, // one day by default
@@ -163,34 +152,33 @@ simpleOAuth2Server
             return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
         }
     })
-    // Enable protection on routes (access only for authenticated users)
-    .extend({
-        // routes which you want to protect, example: ['/secret/documents', '/secret-images/**']
-        routes: ['/comments/'],
-        // methods for protect routes, example (except 'any'): ['get', 'post', 'delete', 'put']
-        methods: ['post']
+    // Enable protection on routes (access only for authenticated users in this example)
+    .defend({
+        // routes which you want to protect
+        routes: ['/secret-data/'],
+        // methods for routes protection (except 'any')
+        methods: ['get', 'post']
     })
-    // Add new protective layer for some routes
-    .addProtect(checkAccess)
-    // Access only for authorized users
-    .extend({
+    // Add new protective layer for some routes (checkAccess = function(req, res, next) {})
+    .add(checkAccess)
+    .defend({
         routes: ['/posts/'],
         methods: ['post']
     })
-    .extend({
+    .defend({
         routes: ['/posts/:post_id'],
         methods: ['put', 'get', 'delete']
     })
     // Remove all previous levels of protection (function checkAccess in this example)
-    .clearProtects()
+    .reset()
     // Add new protective layer for some routes
-    .addProtect(isAdmin)
+    .add(isAdmin)
     // Access only for administator
-    .extend({
+    .defend({
         routes: ['/users/'],
         methods: ['post']
     })
-    .extend({
+    .defend({
         routes: ['/users/:post_id'],
         methods: ['delete']
     });
@@ -209,4 +197,3 @@ npm i && npm start
 ## Have questions or problems?
 You can send me message on justerest@yandex.ru or create an issue.
 I'm glad to listen any questions, criticism and suggestions.
-

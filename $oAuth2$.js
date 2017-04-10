@@ -6,7 +6,7 @@ const tokensDB = require('./lib/create-lowdb.js');
 
 class SimpleOAuth2Server {
     constructor() {
-        this.protect = [this._defaultProtect.bind(this)];
+        this.protect = this.reset().protect;
     }
     configuring(config) {
         const defaultOptions = {
@@ -15,6 +15,11 @@ class SimpleOAuth2Server {
             tokenExpired: 24 * 60 * 60, // one day
             tokenGetPath: '/token',
             tokenRevocationPath: '/tokenRevocation'
+        }
+        if (config.route) config.routes = config.route;
+        if (config.method) config.methods = config.method;
+        if (typeof config.methods === 'string') {
+            config.methods = config.methods.split(',');
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
@@ -31,10 +36,11 @@ class SimpleOAuth2Server {
         app.use(appSettings);
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
+        app.use(this._loadRoutes);
         this.expressApp = app;
         return this;
     }
-    extend(options) {
+    defend(options) {
         this.configuring(options);
         this.expressApp.use(this._loadRoutes);
         return this;
@@ -42,22 +48,19 @@ class SimpleOAuth2Server {
     authorizationHeader(request) {
         return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
     }
-    addProtect(aFunction) {
+    add(aFunction) {
         const self = this;
         self.protect.push(aFunction);
         return self;
     }
-    clearProtects() {
+    reset() {
         const self = this;
         self.protect = [this._defaultProtect.bind(this)];
         return self;
     }
     get _loadRoutes() {
         const router = express.Router();
-        const {
-            methods
-        } = this;
-        methods.forEach((method) => {
+        this.methods.forEach((method) => {
             router[method](this.routes, this.protect);
         });
         return router;
