@@ -76,10 +76,10 @@ Options:
   - type: `array`
   - default: `[]`
 
-## add(function(req, res, next))
+### add(function(req, res, next))
 Add new middleware function for protection in chain.
 
-## reset()
+### reset()
 Removes middleware functions which was added in the chain.
 
 ## Token info
