@@ -1,3 +1,4 @@
+require("babel-polyfill");
 const express = require('express');
 const uuid = require('uuid');
 const moment = require('moment');
@@ -19,7 +20,10 @@ class SimpleOAuth2Server {
         if (config.route) config.routes = config.route;
         if (config.method) config.methods = config.method;
         if (typeof config.methods === 'string') {
-            config.methods = config.methods.split(',');
+            config.methods = config
+                .methods
+                .split(',')
+                .map(element => element.replace(/\s/g, ''));
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
@@ -68,11 +72,11 @@ class SimpleOAuth2Server {
     get _getTokenRoute() {
         return express.Router().post(this.tokenGetPath, authentication.bind(this));
 
-        function authentication(req, res) {
+        async function authentication(req, res) {
             const {
                 refresh_token
             } = req.body;
-            if (this.checkPassword(req) || this._checkRefreshToken(refresh_token)) {
+            if (await this.checkPassword(req) || this._checkRefreshToken(refresh_token)) {
                 const token = Object.assign(this.tokenExtend ? this.tokenExtend(req) : {}, {
                     access_token: uuid(),
                     refresh_token: uuid(),
