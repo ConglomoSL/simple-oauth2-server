@@ -6,33 +6,21 @@ const appSettings = require('./lib/app-settings.js');
 const tokensDB = require('./lib/create-lowdb.js');
 
 class SimpleOAuth2Server {
-    constructor() {
-        this.protect = this.reset().protect;
-    }
-    configuring(config) {
-        const defaultOptions = {
+    get defaultOptions() {
+        return {
             routes: [], // protect routes
             methods: [], // methods for protect routes ['get', 'post', 'delete', 'put']
             tokenExpired: 24 * 60 * 60, // one day
             tokenGetPath: '/token',
             tokenRevocationPath: '/tokenRevocation'
         }
-        if (config.route) config.routes = config.route;
-        if (config.method) config.methods = config.method;
-        if (typeof config.methods === 'string') {
-            config.methods = config
-                .methods
-                .split(',')
-                .map(element => element.replace(/\s/g, ''));
-        }
-        this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
     init(app, options) {
         if (!app) {
             throw Error('Where is express application?');
             exit();
         }
-        this.configuring(options);
+        this._configuring(options);
         if (!this.checkPassword) {
             throw Error('Function for checking user/password is undefined!');
             exit();
@@ -45,12 +33,12 @@ class SimpleOAuth2Server {
         return this;
     }
     defend(options) {
-        this.configuring(options);
+        this._configuring(options, {
+            routes: ['**'],
+            methods: ['get', 'post', 'delete', 'put', 'patch']
+        });
         this.expressApp.use(this._loadRoutes);
         return this;
-    }
-    authorizationHeader(request) {
-        return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
     }
     add(aFunction) {
         const self = this;
@@ -61,6 +49,17 @@ class SimpleOAuth2Server {
         const self = this;
         self.protect = [this._defaultProtect.bind(this)];
         return self;
+    }
+    authorizationHeader(request) {
+        return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+    }
+    _configuring(config = {}, defaultOptions = this.defaultOptions) {
+        if (config.route) config.routes = config.route;
+        if (config.method) config.methods = config.method;
+        if (typeof config.methods === 'string') {
+            config.methods = config.methods.replace(/\s/g, '').split(',');
+        }
+        this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
     get _loadRoutes() {
         const router = express.Router();
@@ -76,6 +75,7 @@ class SimpleOAuth2Server {
             const {
                 refresh_token
             } = req.body;
+
             if (await this.checkPassword(req) || this._checkRefreshToken(refresh_token)) {
                 const token = Object.assign(this.tokenExtend ? this.tokenExtend(req) : {}, {
                     access_token: uuid(),
@@ -85,11 +85,12 @@ class SimpleOAuth2Server {
                 });
                 tokensDB.get('tokens').push(token).write();
                 return res.send(token);
+            } else {
+                return res.status(401).send({
+                    // Message for russian hackers!
+                    "message": "Ошибка аутентификации!"
+                });
             }
-            return res.status(401).send({
-                // Message for russian hackers!
-                "message": "Ошибка аутентификации!"
-            });
         }
     }
     get _revocationTokensRoute() {
@@ -137,6 +138,9 @@ class SimpleOAuth2Server {
         function isTokenInDB(refresh_token) {
             return refresh_token && tokensDB.get('tokens').hasRec('refresh_token', refresh_token);
         }
+    }
+    constructor() {
+        this.protect = this.reset().protect;
     }
 }
 
