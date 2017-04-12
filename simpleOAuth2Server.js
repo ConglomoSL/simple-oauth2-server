@@ -16,19 +16,11 @@ class SimpleOAuth2Server {
         }
     }
     init(app, options) {
-        if (!app) {
-            throw Error('Where is express application?');
-            exit();
-        }
         this._configuring(options);
-        if (!this.checkPassword) {
-            throw Error('Function for checking user/password is undefined!');
-            exit();
-        }
+        this._fatalErrors(app);
         app.use(appSettings);
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
-        app.use(this._loadRoutes);
         this.expressApp = app;
         return this;
     }
@@ -37,36 +29,85 @@ class SimpleOAuth2Server {
             routes: ['**'],
             methods: ['get', 'post', 'delete', 'put', 'patch']
         });
-        this.expressApp.use(this._loadRoutes);
+        this.expressApp.use(this._loadRoutes.call(this));
         return this;
     }
-    add(aFunction) {
+    layer(level, ...aFunctions) {
         const self = this;
-        self.protect.push(aFunction);
+        if (!self.protect[level]) {
+            self.protect[level] = [];
+        }
+        aFunctions.forEach(aFunction => {
+            if (typeof aFunction !== 'function') {
+                return self.protect[level].push(self._checkEvery(aFunction));
+            }
+            return self.protect[level].push(aFunction);
+        });
         return self;
     }
-    reset() {
+    clearLayers() {
         const self = this;
-        self.protect = [this._defaultProtect.bind(this)];
+        self.protect = [
+            [this._defaultProtect.bind(this)]
+        ];
         return self;
     }
     authorizationHeader(request) {
         return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
     }
     _configuring(config = {}, defaultOptions = this.defaultOptions) {
-        if (config.route) config.routes = config.route;
-        if (config.method) config.methods = config.method;
+        if (config.route) {
+            config.routes = config.route;
+        }
+        if (config.method) {
+            config.methods = config.method;
+        }
         if (typeof config.methods === 'string') {
             config.methods = config.methods.replace(/\s/g, '').split(',');
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
-    get _loadRoutes() {
+    _loadRoutes() {
         const router = express.Router();
-        this.methods.forEach((method) => {
-            router[method](this.routes, this.protect);
-        });
+        this.methods.forEach(method => router[method](this.routes, this._protectLayers.call(this)));
         return router;
+    }
+    _protectLayers() {
+        const layers = this.protect;
+        return async(req, res, next) => {
+            console.log(layers);
+            const thisLayers = layers.filter(emptyElement => emptyElement !== undefined).map((layer, i, arr) => {
+                const aFunctions = layer.map(aFunction => {
+                    return this._promiseThanCatch(req, aFunction);
+                });
+                return Promise.race(aFunctions);
+            });
+            const protections = await Promise.all(thisLayers);
+            const everyAllow = protections.every(protection => protection === true);
+            if (everyAllow) {
+                next();
+            } else {
+                res.status(401).send({
+                    // Message for russian hackers!
+                    message: typeof protections === 'string' ? protections : "Ошибка авторизации!"
+                });
+            }
+        }
+    }
+    _promise(req, aFunction) {
+        return new Promise((resolve, reject) => {
+            aFunction(req, resolve, reject)
+        });
+    }
+    _promiseThanCatch(req, aFunction) {
+        return this._promiseResult(this._promise(req, aFunction));
+    }
+    _promiseResult(promise) {
+        return promise
+            .then((r) => {
+                return true;
+            })
+            .catch(message => message && message !== true ? message : false);
     }
     get _getTokenRoute() {
         return express.Router().post(this.tokenGetPath, authentication.bind(this));
@@ -75,22 +116,21 @@ class SimpleOAuth2Server {
             const {
                 refresh_token
             } = req.body;
-
-            if (await this.checkPassword(req) || this._checkRefreshToken(refresh_token)) {
-                const token = Object.assign(this.tokenExtend ? this.tokenExtend(req) : {}, {
-                    access_token: uuid(),
-                    refresh_token: uuid(),
-                    expires_in: this.tokenExpired,
-                    expires_at: moment()
-                });
+            const authResult = await this._promiseThanCatch(req, this.checkPassword);
+            if (this._checkRefreshToken(refresh_token) || authResult === true) {
+                const token = Object.assign(this.tokenExtend ?
+                    this.tokenExtend(req) : {}, {
+                        access_token: uuid(),
+                        refresh_token: uuid(),
+                        expires_in: this.tokenExpired,
+                        expires_at: moment()
+                    });
                 tokensDB.get('tokens').push(token).write();
-                return res.send(token);
-            } else {
-                return res.status(401).send({
-                    // Message for russian hackers!
-                    "message": "Ошибка аутентификации!"
-                });
-            }
+                res.send(token);
+            } else res.status(401).send({
+                // Message for russian hackers!
+                "message": typeof authResult === 'string' ? authResult : "Ошибка аутентификации!"
+            });
         }
     }
     get _revocationTokensRoute() {
@@ -107,7 +147,7 @@ class SimpleOAuth2Server {
             res.send();
         }
     }
-    _defaultProtect(req, res, next) {
+    _defaultProtect(req, next, cancel) {
         const access_token = this.authorizationHeader(req);
         if (access_token) {
             const token = tokensDB.get('tokens').find({
@@ -115,12 +155,11 @@ class SimpleOAuth2Server {
             }).value();
             if (validateToken(token)) {
                 req.token = token;
-                return next();
+                next();
             }
+        } else {
+            cancel('Попытка несанкционированного доступа!');
         }
-        return res.status(401).send({
-            "message": 'Попытка несанкционированного доступа!'
-        });
 
         function validateToken(token) {
             return token && moment(token.expires_at).add(token.expires_in, 'seconds') >= moment();
@@ -139,8 +178,32 @@ class SimpleOAuth2Server {
             return refresh_token && tokensDB.get('tokens').hasRec('refresh_token', refresh_token);
         }
     }
+    _checkEvery(param) {
+        return (req, next, cancel) => {
+            if (isTrue()) {
+                next();
+            } else {
+                cancel();
+            }
+
+            function isTrue() {
+                param = typeof param === 'string' ? param.replace(/\s/g, '').split(',') : param;
+                return req.params[param[0]] === req.token[param[0]] || req.token[param[0]] === param[1];
+            }
+        }
+    }
+    _fatalErrors(app) {
+        if (!app) {
+            throw Error('Where is express application?');
+            exit();
+        }
+        if (!this.checkPassword) {
+            throw Error('Function for checking user/password is undefined!');
+            exit();
+        }
+    }
     constructor() {
-        this.protect = this.reset().protect;
+        this.protect = this.clearLayers().protect;
     }
 }
 
