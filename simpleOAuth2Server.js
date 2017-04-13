@@ -1,24 +1,26 @@
 require("babel-polyfill");
 const express = require('express');
+const bodyParser = require('body-parser');
 const uuid = require('uuid');
 const moment = require('moment');
-const appSettings = require('./lib/app-settings.js');
-const tokensDB = require('./lib/create-lowdb.js');
+const createDB = require('./lib/create-lowdb.js');
 
 class SimpleOAuth2Server {
-    get defaultOptions() {
-        return {
+    constructor() {
+        this.protect = this.clearLayers().protect;
+        this.defaultOptions = {
             routes: [], // protect routes
             methods: [], // methods for protect routes ['get', 'post', 'delete', 'put']
             tokenExpired: 24 * 60 * 60, // one day
             tokenGetPath: '/token',
             tokenRevocationPath: '/tokenRevocation'
-        }
+        };
     }
     init(app, options) {
         this._configuring(options);
         this._fatalErrors(app);
-        app.use(appSettings);
+        this.tokensDB = createDB();
+        app.use(this.appSettings);
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
         this.expressApp = app;
@@ -29,7 +31,7 @@ class SimpleOAuth2Server {
             routes: ['**'],
             methods: ['get', 'post', 'delete', 'put', 'patch']
         });
-        this.expressApp.use(this._loadRoutes.call(this));
+        this.expressApp.use(this._loadRoutes);
         return this;
     }
     layer(level, ...aFunctions) {
@@ -39,9 +41,8 @@ class SimpleOAuth2Server {
         }
         aFunctions.forEach(aFunction => {
             if (typeof aFunction !== 'function') {
-                return self.protect[level].push(self._checkEvery(aFunction));
-            }
-            return self.protect[level].push(aFunction);
+                self.protect[level].push(this._shortFunc(aFunction));
+            } else self.protect[level].push(aFunction);
         });
         return self;
     }
@@ -55,6 +56,25 @@ class SimpleOAuth2Server {
     authorizationHeader(request) {
         return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
     }
+    get appSettings() {
+        return express.Router()
+            .use(bodyParser.urlencoded({
+                extended: false
+            }))
+            .use((req, res, next) => {
+                // Website you wish to allow to connect
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                // Request methods you wish to allow
+                res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH');
+                // Request headers you wish to allow
+                res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,Authorization');
+                // Set to true if you need the website to include cookies in the requests sent
+                // to the API (e.g. in case you use sessions)
+                res.setHeader('Access-Control-Allow-Credentials', true);
+                // Pass to next layer of middleware
+                next();
+            });
+    }
     _configuring(config = {}, defaultOptions = this.defaultOptions) {
         if (config.route) {
             config.routes = config.route;
@@ -67,47 +87,15 @@ class SimpleOAuth2Server {
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
-    _loadRoutes() {
-        const router = express.Router();
-        this.methods.forEach(method => router[method](this.routes, this._protectLayers.call(this)));
-        return router;
-    }
-    _protectLayers() {
-        const layers = this.protect;
-        return async(req, res, next) => {
-            console.log(layers);
-            const thisLayers = layers.filter(emptyElement => emptyElement !== undefined).map((layer, i, arr) => {
-                const aFunctions = layer.map(aFunction => {
-                    return this._promiseThanCatch(req, aFunction);
-                });
-                return Promise.race(aFunctions);
-            });
-            const protections = await Promise.all(thisLayers);
-            const everyAllow = protections.every(protection => protection === true);
-            if (everyAllow) {
-                next();
-            } else {
-                res.status(401).send({
-                    // Message for russian hackers!
-                    message: typeof protections === 'string' ? protections : "Ошибка авторизации!"
-                });
-            }
+    _fatalErrors(app) {
+        if (!app) {
+            throw Error('Where is express application?');
+            exit();
         }
-    }
-    _promise(req, aFunction) {
-        return new Promise((resolve, reject) => {
-            aFunction(req, resolve, reject)
-        });
-    }
-    _promiseThanCatch(req, aFunction) {
-        return this._promiseResult(this._promise(req, aFunction));
-    }
-    _promiseResult(promise) {
-        return promise
-            .then((r) => {
-                return true;
-            })
-            .catch(message => message && message !== true ? message : false);
+        if (!this.checkPassword) {
+            throw Error('Function for checking user/password is undefined!');
+            exit();
+        }
     }
     get _getTokenRoute() {
         return express.Router().post(this.tokenGetPath, authentication.bind(this));
@@ -125,7 +113,7 @@ class SimpleOAuth2Server {
                         expires_in: this.tokenExpired,
                         expires_at: moment()
                     });
-                tokensDB.get('tokens').push(token).write();
+                this.tokensDB.get('tokens').push(token).write();
                 res.send(token);
             } else res.status(401).send({
                 // Message for russian hackers!
@@ -134,25 +122,55 @@ class SimpleOAuth2Server {
         }
     }
     get _revocationTokensRoute() {
-        return express.Router().post(this.tokenRevocationPath, deleteTokens);
+        return express.Router().post(this.tokenRevocationPath, deleteTokens.bind(this));
 
         function deleteTokens(req, res) {
             const {
                 token_type_hint,
                 token
             } = req.body;
-            tokensDB.get('tokens').remove({
-                [token_type_hint]: token
-            }).write();
+            this.tokensDB.get('tokens')
+                .remove({
+                    [token_type_hint]: token
+                })
+                .write();
             res.send();
+        }
+    }
+    get _loadRoutes() {
+        const router = express.Router();
+        this.methods.forEach(method => router[method](this.routes, this._protectLayers.call(this)));
+        return router;
+    }
+    _protectLayers() {
+        const layers = this.protect;
+        return async(req, res, next) => {
+            const thisLayers = layers.filter(cleanEmpty)
+                .map(layer => {
+                    const aFunctions = layer.map(aFunction => this._promise(req, aFunction));
+                    return Promise.race(aFunctions);
+                });
+            const protections = await this._promiseResult(Promise.all(thisLayers));
+            if (protections === true) {
+                next();
+            } else res.status(401).send({
+                // Message for russian hackers!
+                message: typeof protections === 'string' ? protections : "Ошибка авторизации!"
+            });
+        }
+
+        function cleanEmpty(emptyElement) {
+            return emptyElement !== undefined;
         }
     }
     _defaultProtect(req, next, cancel) {
         const access_token = this.authorizationHeader(req);
         if (access_token) {
-            const token = tokensDB.get('tokens').find({
-                access_token: access_token
-            }).value();
+            const token = this.tokensDB.get('tokens')
+                .find({
+                    access_token: access_token
+                })
+                .value();
             if (validateToken(token)) {
                 req.token = token;
                 next();
@@ -167,43 +185,45 @@ class SimpleOAuth2Server {
     }
     _checkRefreshToken(refresh_token) {
         if (isTokenInDB(refresh_token)) {
-            tokensDB.get('tokens').remove({
-                refresh_token: refresh_token
-            }).write();
+            this.tokensDB.get('tokens')
+                .remove({
+                    refresh_token: refresh_token
+                })
+                .write();
             return true;
         }
         return false;
 
         function isTokenInDB(refresh_token) {
-            return refresh_token && tokensDB.get('tokens').hasRec('refresh_token', refresh_token);
+            return refresh_token && this.tokensDB.get('tokens').hasRec('refresh_token', refresh_token);
         }
     }
-    _checkEvery(param) {
+    _promise(req, aFunction) {
+        return new Promise((resolve, reject) => {
+            aFunction(req, resolve, reject)
+        });
+    }
+    _promiseResult(promise) {
+        return promise
+            .then((r) => {
+                return true;
+            })
+            .catch(message => message && message !== true ? message : false);
+    }
+    _promiseThanCatch(req, aFunction) {
+        return this._promiseResult(this._promise(req, aFunction));
+    }
+    _shortFunc(param) {
         return (req, next, cancel) => {
             if (isTrue()) {
                 next();
-            } else {
-                cancel();
-            }
+            } else cancel();
 
             function isTrue() {
                 param = typeof param === 'string' ? param.replace(/\s/g, '').split(',') : param;
                 return req.params[param[0]] === req.token[param[0]] || req.token[param[0]] === param[1];
             }
         }
-    }
-    _fatalErrors(app) {
-        if (!app) {
-            throw Error('Where is express application?');
-            exit();
-        }
-        if (!this.checkPassword) {
-            throw Error('Function for checking user/password is undefined!');
-            exit();
-        }
-    }
-    constructor() {
-        this.protect = this.clearLayers().protect;
     }
 }
 
