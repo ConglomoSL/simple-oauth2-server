@@ -4,25 +4,31 @@ const app = express();
 const low = require('lowdb');
 const usersData = low();
 const secretData = low();
-const hasRec_prototype_in_lowdb = require('./../lib/extend-lowdb.js');
-hasRec_prototype_in_lowdb(usersData);
+const hasRec_in_lowdb = require('./../lib/extend-lowdb.js');
+hasRec_in_lowdb(usersData);
 
-usersData.defaults({
-    users: [{
-        username: 'justerest',
-        password: 'asdasd'
-    }]
-}).write();
+const moment = require('moment');
 
-secretData.defaults({
-    documents: [{
-        level: 'secret',
-        info: 'qwerty'
-    }, {
-        level: 'top-secret',
-        info: '1234567890'
-    }]
-}).write();
+usersData
+    .defaults({
+        users: [{
+            username: 'justerest',
+            password: 'asdasd'
+        }]
+    })
+    .write();
+
+secretData
+    .defaults({
+        documents: [{
+            level: 'secret',
+            info: 'qwerty'
+        }, {
+            level: 'top-secret',
+            info: '1234567890'
+        }]
+    })
+    .write();
 
 // Include simple oAuth2 server and start DB in /secretLocalDataBase
 const simpleOAuth2Server = require('./..');
@@ -49,12 +55,13 @@ simpleOAuth2Server
     // Enable protection on routes (access only for authenticated users in this example)
     .defend({
         // routes which you want to protect
-        routes: ['/secret-data/'],
+        routes: ['/secret-data'],
         // methods for routes protection (except 'any')
         methods: ['get', 'post']
     })
-    // Add new protective layer for some routes (checkAccess = function(req, res, next) {})
-    .add(checkAccess)
+    // Add new protective layer
+    .layer(1, checkAccess)
+    // for some routes(checkAccess = function(req, res, next) {})
     .defend({
         routes: ['/posts/'],
         methods: ['post']
@@ -64,9 +71,9 @@ simpleOAuth2Server
         methods: ['put', 'get', 'delete']
     })
     // Remove all previous levels of protection (function checkAccess in this example)
-    .reset()
+    .clearLayers()
     // Add new protective layer for some routes
-    .add(isAdmin)
+    .layer(1, isAdmin)
     // Access only for administator
     .defend({
         routes: ['/users/'],
@@ -87,25 +94,29 @@ app.listen(3000, () => {
     console.log('Server start');
 });
 
-function authenticationCheck(request) {
+function authenticationCheck(req, next, cancel) {
     const {
         username,
         password
-    } = request.body;
-    if (username && password) {
-        /* If user is in DB and password is matches then return true */
-        return usersData.get('users').hasRec({
-            username: username,
-            password: password
-        });
+    } = req.body;
+    /* If user is in DB and password is matches then return true */
+    if (userInDB()) {
+        next();
+    } else cancel();
+
+    function userInDB() {
+        return username && password && usersData.get('users')
+            .hasRec({
+                username: username,
+                password: password
+            });
     }
-    return false;
 }
 
-function checkAccess(req, res, next) {
-    if (true) {
+function checkAccess(req, next, cancel) {
+    if (moment().format('SS') % 2) {
         next(); /* if have access then next() */
-    } else res.status(401).send('Don`t have access!')
+    } else cancel('Don`t have access!');
 }
 
 function isAdmin(req, res, next) {
