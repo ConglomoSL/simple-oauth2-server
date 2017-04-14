@@ -1,125 +1,91 @@
 const express = require('express');
 const app = express();
 
-const low = require('lowdb');
-const usersData = low();
-const secretData = low();
-const hasRec_in_lowdb = require('./../lib/extend-lowdb.js');
-hasRec_in_lowdb(usersData);
-
-const moment = require('moment');
-
-usersData
-    .defaults({
-        users: [{
-            username: 'justerest',
-            password: 'asdasd'
-        }]
-    })
-    .write();
-
-secretData
-    .defaults({
-        documents: [{
-            level: 'secret',
-            info: 'qwerty'
-        }, {
-            level: 'top-secret',
-            info: '1234567890'
-        }]
-    })
-    .write();
-
-// Include simple oAuth2 server and start DB in /secretLocalDataBase
 const simpleOAuth2Server = require('./..');
 
-simpleOAuth2Server
-    // Let's start session
-    .init(app, {
-        checkPassword: authenticationCheck, // Your function for issuing tokens (required)
-        tokenExpired: 24 * 60 * 60, // one day by default
-        tokenGetPath: '/token',
-        tokenRevocationPath: '/tokenRevocation',
-        // Your function for configuring token format if it's needed
-        tokenExtend: function(request) {
-            return {
-                username: request.body.username
-            };
-        },
-        // Function for extraction access token from headers (must return value of access token)
-        // Configured for Bearer tokens by default
-        authorizationHeader: function(request) {
-            return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+simpleOAuth2Server // Let's start session
+    .init(app, { // Start DB in /secretLocalDataBase
+        checkPassword: (req, next, cancel) => { // Your function for issuing tokens (required)
+            if (req.body.username === 'login' && req.body.password === 'pass') {
+                console.log('Authentication is success!');
+                next();
+            } else cancel('Authentication is fail!');
         }
     })
-    // Enable protection on routes (access only for authenticated users in this example)
-    .defend({
-        // routes which you want to protect
-        routes: ['/secret-data'],
-        // methods for routes protection (except 'any')
-        methods: ['get', 'post']
+    .defend({ // Enable protection on routes (access only for authenticated users)
+        routes: ['/default'], // routes which you want to protect
+        methods: ['get', 'post'] // methods for routes protection (except 'any')
     })
-    // Add new protective layer
-    .layer(1, checkAccess)
-    // for some routes(checkAccess = function(req, res, next) {})
-    .defend({
-        routes: ['/posts/'],
+    .newLayer(A) // Add new protective layer (A = function(req, next, cancel) {...})
+    .newLayer(B) // (B = function(req, next, cancel) {...})
+    .defend({ // Enable protection for some routes with two layers
+        routes: ['/ab/'], // Access will be present if (authenticated && A && B) === true
         methods: ['post']
     })
-    .defend({
+    .defend({ // Defend may be called again and protect another routes with another methods
         routes: ['/posts/:post_id'],
         methods: ['put', 'get', 'delete']
     })
-    // Remove all previous levels of protection (function checkAccess in this example)
-    .clearLayers()
-    // Add new protective layer for some routes
-    .layer(1, isAdmin)
-    // Access only for administator
-    .defend({
-        routes: ['/users/'],
+    .clean() // Remove all previous levels of protection (A)
+    .newLayer(B, C) // Add new protective layer for some routes with several protective functions
+    .or(D, A) // Add protective function in previous layer
+    .defend({ // Access will be present if (authenticated && (B || C || D || A)) === true
+        routes: ['/bcd/'],
         methods: ['post']
     })
-    .defend({
-        routes: ['/users/:post_id'],
+    .newLayer(E)
+    .defend({ // Access will be present if (authenticated && (B || C || D || A) && E) === true
+        routes: ['/bcde/:post_id'],
         methods: ['delete']
+    })
+    .clean()
+    .or(A)
+    .defend({ // Access will be present if (authenticated || A) === true
+        routes: ['/all'],
+        methods: ['get']
     });
 
 // On protect routes you can get token info from `req.token`
-app.get('/secret-data', (req, res) => {
+app.get('/*', (req, res) => {
     console.log(req.token);
-    res.send(secretData.getState());
+    res.send('Access is allow!');
 });
 
 app.listen(3000, () => {
     console.log('Server start');
 });
 
-function authenticationCheck(req, next, cancel) {
-    const {
-        username,
-        password
-    } = req.body;
-    /* If user is in DB and password is matches then return true */
-    if (userInDB()) {
+function A(req, next, cancel) {
+    if (true) {
+        console.log('A is success!');
         next();
-    } else cancel();
-
-    function userInDB() {
-        return username && password && usersData.get('users')
-            .hasRec({
-                username: username,
-                password: password
-            });
-    }
+    } else cancel('A is fail!');
 }
 
-function checkAccess(req, next, cancel) {
-    if (moment().format('SS') % 2) {
-        next(); /* if have access then next() */
-    } else cancel('Don`t have access!');
+function B(req, next, cancel) {
+    if (true) {
+        console.log('B is success!');
+        next();
+    } else cancel('B is fail!');
 }
 
-function isAdmin(req, res, next) {
-    // Если администратор, то идём дальше
-    next();
-};
+function C(req, next, cancel) {
+    if (true) {
+        console.log('C is success!');
+        next();
+    } else cancel('C is fail!');
+}
+
+function D(req, next, cancel) {
+    if (true) {
+        console.log('D is success!');
+        next();
+    } else cancel('D is fail!');
+}
+
+function E(req, next, cancel) {
+    if (true) {
+        console.log('E is success!');
+        next();
+    } else cancel('E is fail!');
+}

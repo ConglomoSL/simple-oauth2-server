@@ -7,7 +7,7 @@
 
  class SimpleOAuth2Server {
      constructor() {
-         this.protect = this.clearLayers().protect;
+         this.protect = this.clean().protect;
          this.defaultOptions = {
              routes: [], // protect routes
              methods: [], // methods for protect routes ['get', 'post', 'delete', 'put']
@@ -34,7 +34,15 @@
          this.expressApp.use(this._loadRoutes);
          return this;
      }
-     layer(level, ...aFunctions) {
+     newLayer() {
+         const level = this.protect.length;
+         return this._layer(level, ...arguments);
+     }
+     or() {
+         const level = this.protect.length - 1;
+         return this._layer(level, ...arguments);
+     }
+     _layer(level, ...aFunctions) {
          if (!this.protect[level]) {
              this.protect[level] = [];
          }
@@ -45,7 +53,7 @@
          });
          return this;
      }
-     clearLayers() {
+     clean() {
          this.protect = [
              [this._defaultProtect.bind(this)]
          ];
@@ -105,8 +113,8 @@
              const {
                  refresh_token
              } = req.body;
-             const authResult = await this._promiseThanCatch(req, this.checkPassword);
-             if (this._checkRefreshToken(refresh_token) || authResult === true) {
+             const authResult = this._promiseThanCatch(req, this.checkPassword);
+             if (this._checkRefreshToken(refresh_token) || await authResult === 'success') {
                  const defaultToken = {
                      access_token: uuid(),
                      refresh_token: uuid(),
@@ -154,7 +162,7 @@
                  return Promise.race(aFunctions);
              });
              const protections = await this._promiseResult(Promise.all(thisLayers));
-             if (protections === true) {
+             if (protections === 'success') {
                  next();
              } else res.status(401).send({
                  // Message for russian hackers!
@@ -208,10 +216,8 @@
      }
      _promiseResult(promise) {
          return promise
-             .then(() => {
-                 return true;
-             })
-             .catch(message => message && message !== true ? message : false);
+             .then(() => 'success')
+             .catch(message => message !== 'success' ? message : false);
      }
      _promiseThanCatch(req, aFunction) {
          return this._promiseResult(this._promise(req, aFunction));
