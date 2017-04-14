@@ -1,9 +1,35 @@
 require("babel-polyfill");
+Promise.any = require('promise-any');
 const express = require('express');
 const bodyParser = require('body-parser');
 const uuid = require('uuid');
 const moment = require('moment');
 const createDB = require('./lib/create-lowdb.js');
+
+class apiDB {
+    constructor() {
+        this.DB = createDB();
+        return this;
+    }
+    write(data) {
+        this.DB
+            .get('tokens')
+            .push(data)
+            .write();
+    }
+    remove(queryObj) {
+        this.DB
+            .get('tokens')
+            .remove(queryObj)
+            .write();
+    }
+    find(queryObj) {
+        return this.DB
+            .get('tokens')
+            .find(queryObj)
+            .value();
+    }
+}
 
 class SimpleOAuth2Server {
     constructor() {
@@ -19,7 +45,7 @@ class SimpleOAuth2Server {
     init(app, options) {
         this._configuring(options);
         this._fatalErrors(app);
-        this.tokensDB = createDB();
+        this.tokensDB = new apiDB;
         app.use(this.appSettings);
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
@@ -114,7 +140,7 @@ class SimpleOAuth2Server {
                 refresh_token
             } = req.body;
             const authResult = this._promiseThanCatch(req, this.checkPassword);
-            if (this._checkRefreshToken(refresh_token) || await authResult === 'success') {
+            if (this._checkRefreshToken.call(this, refresh_token) || await authResult === 'success') {
                 const defaultToken = {
                     access_token: uuid(),
                     refresh_token: uuid(),
@@ -122,10 +148,7 @@ class SimpleOAuth2Server {
                     expires_at: moment()
                 };
                 const token = Object.assign(this.tokenExtend(req), defaultToken);
-                this.tokensDB
-                    .get('tokens')
-                    .push(token)
-                    .write();
+                this.tokensDB.write(token);
                 res.send(token);
             } else res.status(401).send({
                 // Message for russian hackers!
@@ -141,11 +164,9 @@ class SimpleOAuth2Server {
                 token_type_hint,
                 token
             } = req.body;
-            this.tokensDB.get('tokens')
-                .remove({
-                    [token_type_hint]: token
-                })
-                .write();
+            this.tokensDB.remove({
+                [token_type_hint]: token
+            });
             res.send();
         }
     }
@@ -157,9 +178,10 @@ class SimpleOAuth2Server {
     _protectLayers() {
         const layers = this.protect.filter(cleanEmpty);
         return async(req, res, next) => {
+            let p;
             const thisLayers = layers.map(layer => {
-                const aFunctions = layer.map(aFunction => this._promise(req, aFunction));
-                return Promise.race(aFunctions);
+                const promises = layer.map(aFunction => this._promise(req, aFunction));
+                return Promise.any(promises);
             });
             const protections = await this._promiseResult(Promise.all(thisLayers));
             if (protections === 'success') {
@@ -177,16 +199,15 @@ class SimpleOAuth2Server {
     _defaultProtect(req, next, cancel) {
         const access_token = this.authorizationHeader(req);
         if (access_token) {
-            const token = this.tokensDB
-                .get('tokens')
-                .find({
-                    access_token: access_token
-                })
-                .value();
+            const token = this.tokensDB.find({
+                access_token: access_token
+            });
             if (validateToken(token)) {
                 req.token = token;
                 next();
-            }
+            } else this.tokensDB.remove({
+                access_token: access_token
+            });
         }
         cancel('Попытка несанкционированного доступа!');
 
@@ -195,18 +216,19 @@ class SimpleOAuth2Server {
         }
     }
     _checkRefreshToken(refresh_token) {
-        if (isTokenInDB(refresh_token)) {
-            this.tokensDB.get('tokens')
-                .remove({
-                    refresh_token: refresh_token
-                })
-                .write();
+        if (isTokenInDB.call(this)) {
+            this.tokensDB.remove({
+                refresh_token: refresh_token
+            });
             return true;
         }
         return false;
 
-        function isTokenInDB(refresh_token) {
-            return refresh_token && this.tokensDB.get('tokens').hasRec('refresh_token', refresh_token);
+        function isTokenInDB() {
+            const token = this.tokensDB.find({
+                refresh_token: refresh_token
+            });
+            return refresh_token && token && token.access_token.length;
         }
     }
     _promise(req, aFunction) {

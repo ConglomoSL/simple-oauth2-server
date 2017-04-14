@@ -1,6 +1,6 @@
 {
   "name": "simple-oauth2-server",
-  "version": "0.10.0-beta.755",
+  "version": "0.10.1-beta.755",
   "description": "Simple module for deploying oAuth2 server with several levels of protection. Perfect work with ember-simple-auth",
   "main": "index.js",
   "scripts": {
@@ -23,6 +23,7 @@
     "express": "^4.15.2",
     "lowdb": "^0.16.0",
     "moment": "^2.18.1",
+    "promise-any": "^0.2.0",
     "uuid": "^3.0.1"
   },
   "devDependencies": {

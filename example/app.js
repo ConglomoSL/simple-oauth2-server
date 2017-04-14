@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 
-const simpleOAuth2Server = require('./..');
+const simpleOAuth2Server = require('./../simpleOAuth2Server.js');
 
 simpleOAuth2Server // Let's start session
     .init(app, { // Start DB in /secretLocalDataBase
@@ -10,16 +10,17 @@ simpleOAuth2Server // Let's start session
                 console.log('Authentication is success!');
                 next();
             } else cancel('Authentication is fail!');
-        }
+        },
+        tokenExpired: 20
     })
     .defend({ // Enable protection on routes (access only for authenticated users)
-        routes: ['/default'], // routes which you want to protect
+        routes: ['/secret-data'], // routes which you want to protect
         methods: ['get', 'post'] // methods for routes protection (except 'any')
     })
     .newLayer(A) // Add new protective layer (A = function(req, next, cancel) {...})
     .newLayer(B) // (B = function(req, next, cancel) {...})
     .defend({ // Enable protection for some routes with two layers
-        routes: ['/ab/'], // Access will be present if (authenticated && A && B) === true
+        routes: ['/ab'], // Access will be present if (authenticated && A && B) === true
         methods: ['post']
     })
     .defend({ // Defend may be called again and protect another routes with another methods
@@ -39,24 +40,24 @@ simpleOAuth2Server // Let's start session
         methods: ['delete']
     })
     .clean()
-    .or(A)
+    .or(A, B)
     .defend({ // Access will be present if (authenticated || A) === true
         routes: ['/all'],
         methods: ['get']
     });
 
 // On protect routes you can get token info from `req.token`
-app.get('/*', (req, res) => {
-    console.log(req.token);
-    res.send('Access is allow!');
-});
+
+app.get('/all', (req, res) => {
+    res.send('all');
+})
 
 app.listen(3000, () => {
     console.log('Server start');
 });
 
 function A(req, next, cancel) {
-    if (true) {
+    if (false) {
         console.log('A is success!');
         next();
     } else cancel('A is fail!');
