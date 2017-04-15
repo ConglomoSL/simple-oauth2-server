@@ -4,32 +4,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const uuid = require('uuid');
 const moment = require('moment');
-const createDB = require('./lib/create-lowdb.js');
-
-class apiDB {
-    constructor() {
-        this.DB = createDB();
-        return this;
-    }
-    write(data) {
-        this.DB
-            .get('tokens')
-            .push(data)
-            .write();
-    }
-    remove(queryObj) {
-        this.DB
-            .get('tokens')
-            .remove(queryObj)
-            .write();
-    }
-    find(queryObj) {
-        return this.DB
-            .get('tokens')
-            .find(queryObj)
-            .value();
-    }
-}
+const lowdbAPI = require('./api/lowdb');
 
 class SimpleOAuth2Server {
     constructor() {
@@ -39,13 +14,14 @@ class SimpleOAuth2Server {
             methods: [], // methods for protect routes ['get', 'post', 'delete', 'put']
             tokenExpired: 24 * 60 * 60, // one day
             tokenGetPath: '/token',
-            tokenRevocationPath: '/tokenRevocation'
+            tokenRevocationPath: '/tokenRevocation',
+            tokensDB: lowdbAPI
         };
     }
     init(app, options) {
         this._configuring(options);
         this._fatalErrors(app);
-        this.tokensDB = new apiDB;
+        this.tokensDB = this.tokensDB.connect();
         app.use(this.appSettings);
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
@@ -68,20 +44,9 @@ class SimpleOAuth2Server {
         const level = this.protect.length - 1;
         return this._layer(level, ...arguments);
     }
-    _layer(level, ...aFunctions) {
-        if (!this.protect[level]) {
-            this.protect[level] = [];
-        }
-        aFunctions.forEach(aFunction => {
-            if (typeof aFunction !== 'function') {
-                this.protect[level].push(this._shortFunc(aFunction));
-            } else this.protect[level].push(aFunction);
-        });
-        return this;
-    }
     clean() {
         this.protect = [
-            [this._defaultProtect.bind(this)]
+            ['defaultProtection']
         ];
         return this;
     }
@@ -135,22 +100,24 @@ class SimpleOAuth2Server {
     get _getTokenRoute() {
         return express.Router().post(this.tokenGetPath, authentication.bind(this));
 
-        async function authentication(req, res) {
+        async function authentication(request, response) {
             const {
                 refresh_token
-            } = req.body;
-            const authResult = this._promiseThanCatch(req, this.checkPassword);
-            if (this._checkRefreshToken.call(this, refresh_token) || await authResult === 'success') {
+            } = request.body;
+            const authResult = refresh_token ?
+                await this._checkRefreshToken.call(this, refresh_token) :
+                await this._promiseThanCatch(request, this.checkPassword);
+            if (refresh_token ? authResult : authResult === 'success') {
                 const defaultToken = {
                     access_token: uuid(),
                     refresh_token: uuid(),
                     expires_in: this.tokenExpired,
-                    expires_at: moment()
+                    expires_at: moment().format('MMDDHHmmss')
                 };
-                const token = Object.assign(this.tokenExtend(req), defaultToken);
+                const token = Object.assign(refresh_token ? authResult : this.tokenExtend(request), defaultToken);
                 this.tokensDB.write(token);
-                res.send(token);
-            } else res.status(401).send({
+                response.send(token);
+            } else response.status(401).send({
                 // Message for russian hackers!
                 "message": typeof authResult === 'string' ? authResult : "Ошибка аутентификации!"
             });
@@ -164,9 +131,7 @@ class SimpleOAuth2Server {
                 token_type_hint,
                 token
             } = req.body;
-            this.tokensDB.remove({
-                [token_type_hint]: token
-            });
+            this.tokensDB.remove(token_type_hint, token);
             res.send();
         }
     }
@@ -178,9 +143,19 @@ class SimpleOAuth2Server {
     _protectLayers() {
         const layers = this.protect.filter(cleanEmpty);
         return async(req, res, next) => {
-            let p;
-            const thisLayers = layers.map(layer => {
-                const promises = layer.map(aFunction => this._promise(req, aFunction));
+            await this._promise(req, this._defaultProtect.bind(this))
+                .then(() => {
+                    layers[0][0] = Promise.resolve();
+                })
+                .catch((message) => {
+                    layers[0][0] = Promise.reject(message);
+                });
+            const thisLayers = layers.map((layer, i) => {
+                const promises = layer.map((aFunction, j) => {
+                    if (i + j) {
+                        return this._promise(req, aFunction)
+                    } else return aFunction;
+                });
                 return Promise.any(promises);
             });
             const protections = await this._promiseResult(Promise.all(thisLayers));
@@ -188,7 +163,7 @@ class SimpleOAuth2Server {
                 next();
             } else res.status(401).send({
                 // Message for russian hackers!
-                message: typeof protections === 'string' ? protections : "Ошибка авторизации!"
+                message: typeof protections[0] === 'string' ? protections[0] : "Ошибка авторизации!"
             });
         };
 
@@ -196,40 +171,39 @@ class SimpleOAuth2Server {
             return element !== undefined;
         }
     }
-    _defaultProtect(req, next, cancel) {
+    _layer(level, ...aFunctions) {
+        if (!this.protect[level]) {
+            this.protect[level] = [];
+        }
+        aFunctions.forEach(aFunction => {
+            if (typeof aFunction !== 'function') {
+                this.protect[level].push(this._shortFunc(aFunction));
+            } else this.protect[level].push(aFunction);
+        });
+        return this;
+    }
+    async _defaultProtect(req, next, cancel) {
         const access_token = this.authorizationHeader(req);
         if (access_token) {
-            const token = this.tokensDB.find({
-                access_token: access_token
-            });
+            const token = await this.tokensDB.find('access_token', access_token);
+            if (token) req.token = token;
             if (validateToken(token)) {
-                req.token = token;
                 next();
-            } else this.tokensDB.remove({
-                access_token: access_token
-            });
+            } else this.tokensDB.remove('access_token', access_token);
         }
         cancel('Попытка несанкционированного доступа!');
 
         function validateToken(token) {
-            return token && moment(token.expires_at).add(token.expires_in, 'seconds') >= moment();
+            return token && moment(token.expires_at, 'MMDDHHmmss').add(token.expires_in, 'seconds') >= moment();
         }
     }
-    _checkRefreshToken(refresh_token) {
-        if (isTokenInDB.call(this)) {
-            this.tokensDB.remove({
-                refresh_token: refresh_token
-            });
-            return true;
+    async _checkRefreshToken(refresh_token) {
+        const token = await this.tokensDB.find('refresh_token', refresh_token);
+        if (refresh_token && token && token.access_token.length) {
+            this.tokensDB.remove('refresh_token', refresh_token);
+            return token;
         }
         return false;
-
-        function isTokenInDB() {
-            const token = this.tokensDB.find({
-                refresh_token: refresh_token
-            });
-            return refresh_token && token && token.access_token.length;
-        }
     }
     _promise(req, aFunction) {
         return new Promise((resolve, reject) => {

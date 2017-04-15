@@ -1,10 +1,9 @@
 const express = require('express');
 const app = express();
 
-const simpleOAuth2Server = require('./../simpleOAuth2Server.js');
+const soas2 = require('./../simpleOAuth2Server.js');
 
-simpleOAuth2Server // Let's start session
-    .init(app, { // Start DB in /secretLocalDataBase
+soas2.init(app, { // Start DB in /secretLocalDataBase
         checkPassword: (req, next, cancel) => { // Your function for issuing tokens (required)
             if (req.body.username === 'login' && req.body.password === 'pass') {
                 console.log('Authentication is success!');
@@ -57,7 +56,7 @@ app.listen(3000, () => {
 });
 
 function A(req, next, cancel) {
-    if (false) {
+    if (true) {
         console.log('A is success!');
         next();
     } else cancel('A is fail!');
