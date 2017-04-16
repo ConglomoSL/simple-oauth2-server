@@ -21,7 +21,7 @@ class SimpleOAuth2Server {
     init(app, options) {
         this._configuring(options);
         this._fatalErrors(app);
-        this.tokensDB = this.tokensDB.connect();
+        this.tokensDB.connect();
         app.use(this.appSettings);
         app.use(this._getTokenRoute);
         app.use(this._revocationTokensRoute);
@@ -41,7 +41,7 @@ class SimpleOAuth2Server {
         return this._layer(level, ...arguments);
     }
     or() {
-        const level = this.protect.length - 1;
+        const level = --this.protect.length;
         return this._layer(level, ...arguments);
     }
     clean() {
@@ -117,10 +117,12 @@ class SimpleOAuth2Server {
                 const token = Object.assign(refresh_token ? authResult : this.tokenExtend(request), defaultToken);
                 this.tokensDB.write(token);
                 response.send(token);
-            } else response.status(401).send({
+            } else {
                 // Message for russian hackers!
-                "message": typeof authResult === 'string' ? authResult : "Ошибка аутентификации!"
-            });
+                response.status(401).send({
+                    "message": typeof authResult === 'string' ? authResult : "Ошибка аутентификации!"
+                });
+            }
         }
     }
     get _revocationTokensRoute() {
@@ -144,27 +146,27 @@ class SimpleOAuth2Server {
         const layers = this.protect.filter(cleanEmpty);
         return async(req, res, next) => {
             await this._promise(req, this._defaultProtect.bind(this))
-                .then(() => {
-                    layers[0][0] = Promise.resolve();
-                })
-                .catch((message) => {
-                    layers[0][0] = Promise.reject(message);
-                });
+                .then(() => layers[0][0] = Promise.resolve())
+                .catch((message) => layers[0][0] = Promise.reject(message));
             const thisLayers = layers.map((layer, i) => {
                 const promises = layer.map((aFunction, j) => {
                     if (i + j) {
                         return this._promise(req, aFunction)
-                    } else return aFunction;
+                    } else {
+                        return aFunction;
+                    }
                 });
                 return Promise.any(promises);
             });
             const protections = await this._promiseResult(Promise.all(thisLayers));
             if (protections === 'success') {
                 next();
-            } else res.status(401).send({
+            } else {
                 // Message for russian hackers!
-                message: typeof protections[0] === 'string' ? protections[0] : "Ошибка авторизации!"
-            });
+                res.status(401).send({
+                    message: typeof protections[0] === 'string' ? protections[0] : "Ошибка авторизации!"
+                });
+            }
         };
 
         function cleanEmpty(element) {
@@ -178,7 +180,9 @@ class SimpleOAuth2Server {
         aFunctions.forEach(aFunction => {
             if (typeof aFunction !== 'function') {
                 this.protect[level].push(this._shortFunc(aFunction));
-            } else this.protect[level].push(aFunction);
+            } else {
+                this.protect[level].push(aFunction);
+            }
         });
         return this;
     }
@@ -189,7 +193,9 @@ class SimpleOAuth2Server {
             if (token) req.token = token;
             if (validateToken(token)) {
                 next();
-            } else this.tokensDB.remove('access_token', access_token);
+            } else {
+                this.tokensDB.remove('access_token', access_token);
+            }
         }
         cancel('Попытка несанкционированного доступа!');
 

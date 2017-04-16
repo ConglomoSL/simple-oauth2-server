@@ -1,15 +1,12 @@
 const mysql = require('mysql');
 
 class mysqlAPI {
-    connect() {
-        this.connection = mysql.createConnection(this.config);
+    config(options) {
+        this.config = options;
         return this;
     }
-    static config(options) {
-        return new mysqlAPI(options);
-    }
-    constructor(options) {
-        this.config = options;
+    connect() {
+        this.connection = mysql.createConnection(this.config);
     }
     write(dataObj) {
         const keys = Object.keys(dataObj);
@@ -34,4 +31,4 @@ class mysqlAPI {
     }
 }
 
-module.exports = mysqlAPI;
+module.exports = new mysqlAPI;
