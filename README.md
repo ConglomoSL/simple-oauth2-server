@@ -6,8 +6,8 @@ Simple module for deploying oAuth2 server and enstablish several levels of prote
 May be it help you to fast develope application.
 
 It use <a href="https://github.com/typicode/lowdb">`lowdb`</a> for saving tokens in session by default. And you can start developing now without creating data base. If you have DB and want to saving tokens in it you can write simple API for this module like:
--<a href="https://github.com/justerest/simple-oauth2-server/blob/master/api/lowdb.js">lowdb</a> (default)
--<a href="https://github.com/justerest/simple-oauth2-server/blob/master/api/mysql.js">mySQL</a>
+- <a href="https://github.com/justerest/simple-oauth2-server/blob/master/api/lowdb.js">lowdb</a> (default)
+- <a href="https://github.com/justerest/simple-oauth2-server/blob/master/api/mysql.js">mySQL</a>
 
 
 ## Basic usage
@@ -40,7 +40,7 @@ simpleOAuth2Server.defend({
 ```
 Your protection is enabled! And server send tokens on requests on `tokenGetPath` (by default '/token').
 
-### More detailed usage
+## More detailed usage
 You can watch an usage example on https://github.com/justerest/simple-oauth2-server/blob/master/example/app.js
 
 ## Methods
