@@ -1,54 +1,63 @@
 const express = require('express');
 const app = express();
+const simpleOAuth2Server = require('./../');
 
-const soas2 = require('./../simpleOAuth2Server.js');
+simpleOAuth2Server.init(app, {
+    // Your function for issuing tokens (required)
+    checkPassword: (req, next, cancel) => {
+        const { username, password } = req.body;
+        if (username === 'login' && password === 'pass') {
+            console.log('Authentication is success!');
+            next();
+        } else {
+            console.log('Wrong password!');
+            cancel('Authentication is fail!');
+        }
+    }
+});
 
-soas2.init(app, { // Start DB in /secretLocalDataBase
-        checkPassword: (req, next, cancel) => { // Your function for issuing tokens (required)
-            if (req.body.username === 'login' && req.body.password === 'pass') {
-                console.log('Authentication is success!');
-                next();
-            } else cancel('Authentication is fail!');
-        },
-        tokenExpired: 20
-    })
-    .defend({ // Enable protection on routes (access only for authenticated users)
+simpleOAuth2Server.defend({ // Enable protection on routes (access only for authenticated users)
         routes: ['/secret-data'], // routes which you want to protect
-        methods: ['get', 'post'] // methods for routes protection (except 'any')
+        methods: ['get', 'post', 'put', 'delete', 'patch'] // methods for routes protection
     })
-    .newLayer(A) // Add new protective layer (A = function(req, next, cancel) {...})
-    .newLayer(B) // (B = function(req, next, cancel) {...})
+    .and(A) // Add new protective layer (A = function(req, next, cancel) {...})
+    .and(B)
     .defend({ // Enable protection for some routes with two layers
-        routes: ['/ab'], // Access will be present if (authenticated && A && B) === true
-        methods: ['post']
+        routes: ['/a/b'], // Access will be present if (authenticated && A && B) is true
+        methods: ['get', 'post', 'put', 'delete', 'patch']
     })
     .defend({ // Defend may be called again and protect another routes with another methods
-        routes: ['/posts/:post_id'],
-        methods: ['put', 'get', 'delete']
+        routes: ['/a/b/2'],
+        methods: 'get,post,put,delete,patch'
     })
-    .clean() // Remove all previous levels of protection (A)
-    .newLayer(B, C) // Add new protective layer for some routes with several protective functions
+    .clean() // Remove all previous levels of protection in chain
+    .and(B, C) // Add new protective layer for some routes with several protective functions
     .or(D, A) // Add protective function in previous layer
     .defend({ // Access will be present if (authenticated && (B || C || D || A)) === true
-        routes: ['/bcd/'],
-        methods: ['post']
+        route: ['/bcda/'],
+        method: 'get,post,put,delete,patch'
     })
-    .newLayer(E)
+    .and(E)
     .defend({ // Access will be present if (authenticated && (B || C || D || A) && E) === true
-        routes: ['/bcde/:post_id'],
-        methods: ['delete']
+        routes: ['/bcda/e'],
+        methods: 'get,post,put,delete,patch'
     })
     .clean()
     .or(A, B)
-    .defend({ // Access will be present if (authenticated || A) === true
-        routes: ['/all'],
-        methods: ['get']
+    .defend({ // Access will be present if (authenticated || A || B) === true
+        routes: ['/auth_a_b'],
+        methods: 'get,post,put,delete,patch'
     });
 
-// On protect routes you can get token info from `req.token`
+const customLayer = simpleOAuth2Server.and(A, B).and(C).or(D).layersProtect;
+app.post('/custom_protection', customLayer, (req, res) => {
+    res.send('OK!');
+});
 
-app.get('/all', (req, res) => {
-    res.send('all');
+// On protect routes you can get token info from `req.token`
+app.all('/*', (req, res) => {
+    console.log(req.token);
+    res.send('Access is allow!');
 })
 
 app.listen(3000, () => {

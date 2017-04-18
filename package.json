@@ -1,13 +1,13 @@
 {
   "name": "simple-oauth2-server",
-  "version": "0.11.0-beta.8",
+  "version": "1.0.0-beta.9",
   "description": "Simple module for deploying oAuth2 server with several levels of protection. Perfect work with ember-simple-auth",
-  "main": "./node.v6/index.js",
+  "main": "./node.v6.app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "cd example/ && node app.js",
-    "build": "babel simpleOAuth2Server.js --minified -o ./node.v6/index.js",
-    "watch": "babel simpleOAuth2Server.js -w --minified -o ./node.v6/index.js"
+    "build": "babel simpleOAuth2Server.js --minified -o ./node.v6.app.js",
+    "watch": "babel simpleOAuth2Server.js -w --minified -o ./node.v6.app.js"
   },
   "keywords": [
     "oauth2",
