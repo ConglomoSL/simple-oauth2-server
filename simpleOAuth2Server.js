@@ -23,7 +23,7 @@ class SimpleOAuth2Server {
         app.use(this.appSettings)
             .use(this._getTokenRoute)
             .use(this._revocationTokensRoute);
-        this.expressApp = app;
+        this.__proto__ = Object.assign(this.__proto__, { expressApp: app });
         return this;
     }
     defend(options) {
@@ -54,11 +54,15 @@ class SimpleOAuth2Server {
         const _layers = copyArray(this.protection);
         return async(request, response, next) => {
             await promiseMiddleware(request, this._defaultProtect.bind(this))
-                .then(() => { _layers[0][0] = Promise.resolve(); })
-                .catch(message => { _layers[0][0] = Promise.reject(message); });
+                .then(() => {
+                    _layers[0][0] = Promise.resolve();
+                })
+                .catch(message => {
+                    _layers[0][0] = Promise.reject(message);
+                });
             const thisLayers = _layers.map((layer, i) => {
                 const promises = layer.map((aFunction, j) => {
-                    return (i + j) ? promiseMiddleware(request, aFunction) : aFunction;
+                    return i + j ? promiseMiddleware(request, aFunction) : aFunction
                 });
                 return Promise.any(promises);
             });
@@ -76,9 +80,7 @@ class SimpleOAuth2Server {
     }
     get appSettings() {
         return express.Router()
-            .use(bodyParser.urlencoded({
-                extended: false
-            }))
+            .use(bodyParser.urlencoded({ extended: false }))
             .use((req, res, next) => {
                 res.setHeader('Access-Control-Allow-Origin', '*');
                 res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH');
@@ -87,23 +89,23 @@ class SimpleOAuth2Server {
             });
     }
     _configuring(config = {}, defaultOptions = this.defaultOptions) {
-        if (config.route) {
+        if(config.route) {
             config.routes = config.route;
         }
-        if (config.method) {
+        if(config.method) {
             config.methods = config.method;
         }
-        if (typeof config.methods === 'string') {
+        if(typeof config.methods === 'string') {
             config.methods = config.methods.replace(/\s/g, '').split(',');
         }
         this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
     }
     _fatalErrors(app) {
-        if (!app) {
+        if(!app) {
             throw new Error('Where is express application?');
             exit();
         }
-        if (!this.checkPassword) {
+        if(!this.checkPassword) {
             throw new Error('Function for checking user/password is undefined!');
             exit();
         }
@@ -117,7 +119,7 @@ class SimpleOAuth2Server {
         const authResult = refresh_token ?
             await this._checkRefreshToken.call(this, refresh_token) :
             await promiseResult(promiseMiddleware(request, this.checkPassword));
-        if (refresh_token ? authResult : authResult === 'success') {
+        if(refresh_token ? authResult : authResult === 'success') {
             const defaultToken = {
                 access_token: uuid(),
                 refresh_token: uuid(),
@@ -152,26 +154,24 @@ class SimpleOAuth2Server {
     }
     _layer(level, ...aFunctions) {
         const newObject = this._copyObject;
-        if (!Array.isArray(newObject.protection[level])) {
+        if(!Array.isArray(newObject.protection[level])) {
             newObject.protection[level] = [];
         }
         aFunctions.forEach(aFunction => {
-            typeof aFunction !== 'function' ?
-                newObject.protection[level].push(shortFunction(aFunction)) :
-                newObject.protection[level].push(aFunction);
+            newObject.protection[level]
+                .push(typeof aFunction !== 'function' ? shortFunction(aFunction) : aFunction);
         });
         return newObject;
     }
     get _copyObject() {
         const newObject = new SimpleOAuth2Server;
-        newObject.expressApp = this.expressApp;
+        newObject.__proto__ = Object.assign(newObject.__proto__, this.__proto__);
         newObject.protection = copyArray(this.protection);
-        newObject.tokensDB = this.tokensDB;
         return newObject;
     }
     async _defaultProtect(req, next, cancel) {
         const access_token = this.authorizationHeader(req);
-        if (access_token) {
+        if(access_token) {
             const token = await this.tokensDB.find('access_token', access_token);
             req.token = token ? token : null;
             validateToken(token) ?
@@ -182,7 +182,7 @@ class SimpleOAuth2Server {
     }
     async _checkRefreshToken(refresh_token) {
         const token = await this.tokensDB.find('refresh_token', refresh_token);
-        if (refresh_token && token && token.access_token.length) {
+        if(refresh_token && token && token.access_token.length) {
             this.tokensDB.remove('refresh_token', refresh_token);
             return token;
         }
@@ -212,7 +212,7 @@ function copyArray(array) {
 }
 
 function shortFunction(param) {
-    return (req, next, cancel) => {
+    return(req, next, cancel) => {
         param = typeof param === 'string' ? param.replace(/\s/g, '').split(',') : param;
         req.params[param[0]] === req.token[param[0]] || req.token[param[0]] === param[1] ?
             next() :

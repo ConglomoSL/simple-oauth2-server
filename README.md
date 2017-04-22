@@ -17,31 +17,69 @@ npm i --save simple-oauth2-server
 ```javascript
 const express = require('express');
 const app = express();
-const simpleOAuth2Server = require('simple-oauth2-server');
+const soAs2 = require('simple-oauth2-server');
 
-simpleOAuth2Server.init(app, {
-    // your function for authentication
-    checkPassword: (req, next, cancel) => {
-        const { username, password } = req.body;
-        if (username === 'login' && password === 'pass') {
-            console.log('Authentication is success!');
-            next();
-        } else {
-            console.log('Wrong password!');
-            cancel('Authentication is fail!');
+soAs2.init(app, {
+        // your function for authentication
+        checkPassword: (req, next, cancel) => {
+            const { username, password } = req.body;
+            if(username === 'login' && password === 'pass') {
+                console.log('Authentication is success!');
+                next();
+            } else {
+                console.log('Wrong password!');
+                cancel('Authentication is fail!');
+            }
         }
-    }
-});
-
-simpleOAuth2Server.defend({
-    routes: ['/secret'], // routes which you want to protect
-    methods: ['get', 'post', 'delete', 'put'] // methods which you want to protect
-});
+    })
+    .defend({
+        routes: ['/secret'], // routes which you want to protect
+        methods: ['get', 'post', 'delete', 'put'] // methods which you want to protect
+    });
 ```
 Your protection is enabled! And server send tokens on requests on `tokenGetPath` (by default '/token').
 
 ## More detailed usage
 You can watch an usage example on https://github.com/justerest/simple-oauth2-server/blob/master/example/app.js
+```javascript
+simpleOAuth2Server.defend({ // Enable protection on routes (access only for authenticated users)
+        routes: ['/secret-data'], // routes which you want to protect
+        methods: ['get', 'post', 'put', 'delete', 'patch'] // methods for routes protection
+    })
+    .and(A) // Add new protective layer (A = function(req, next, cancel) {...})
+    .and(B)
+    .defend({ // Enable protection for some routes with two layers
+        routes: ['/a/b'], // Access will be present if (authenticated && A && B)
+        methods: ['get', 'post', 'put', 'delete', 'patch']
+    })
+    .defend({ // Defend may be called again and protect another routes with another methods
+        routes: ['/a/b/2'],
+        methods: 'get,post,put,delete,patch'
+    })
+    .clean() // Remove all previous levels of protection in chain
+    .and(B, C) // Add new protective layer for some routes with several protective functions
+    .or(D, A) // Add protective function in previous layer
+    .defend({ // Access will be present if (authenticated && (B || C || D || A))
+        route: ['/bcda/'],
+        method: 'get,post,put,delete,patch'
+    })
+    .and(E)
+    .defend({ // Access will be present if (authenticated && (B || C || D || A) && E)
+        routes: ['/bcda/e'],
+        methods: 'get,post,put,delete,patch'
+    })
+    .clean()
+    .or(A, B)
+    .defend({ // Access will be present if (authenticated || A || B)
+        routes: ['/auth_a_b'],
+        methods: 'get,post,put,delete,patch'
+    });
+
+const customLayer = simpleOAuth2Server.and(A, B).and(C).or(D).layersProtect;
+app.post('/custom_protection', customLayer, (req, res) => {
+    res.send('OK!');
+});
+```
 
 ## Methods
 ### init(app, options)

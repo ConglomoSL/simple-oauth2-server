@@ -1,9 +1,8 @@
 const mysql = require('mysql');
 
-class mysqlAPI {
-    config(options) {
+module.exports = class mysqlAPI {
+    constructor(options) {
         this.config = options;
-        return this;
     }
     connect() {
         this.connection = mysql.createConnection(this.config);
@@ -21,7 +20,7 @@ class mysqlAPI {
         const queryString = "SELECT * FROM `tokens` WHERE `" + key + "` LIKE '" + value + "'";
         return new Promise((resolve, reject) => {
                 this.connection.query(queryString, (err, row) => {
-                    if (!err && row[0]) {
+                    if(!err && row[0]) {
                         resolve(row[0]);
                     }
                     reject();
@@ -30,5 +29,3 @@ class mysqlAPI {
             .catch(() => false);
     }
 }
-
-module.exports = new mysqlAPI;
