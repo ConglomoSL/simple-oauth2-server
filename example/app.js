@@ -1,100 +1,96 @@
 const express = require('express');
 const app = express();
-const simpleOAuth2Server = require('./../');
+const soas2 = require('./../simpleOAuth2Server');
 
-simpleOAuth2Server.init(app, {
-    // Your function for issuing tokens (required)
+soas2.init({
+    expressApp: app,
     checkPassword: (req, next, cancel) => {
-        const { username, password } = req.body;
-        if (username === 'login' && password === 'pass') {
-            console.log('Authentication is success!');
-            next();
-        } else {
-            console.log('Wrong password!');
-            cancel('Authentication is fail!');
-        }
+      const { username, password } = req.body;
+      if(username === 'login' && password === 'pass') {
+        console.log('Authentication is success!');
+        next();
+      }
+      console.log('Wrong password!');
+      cancel('Authentication is fail!');
     }
-});
+  })
+  .defend({ // Enable protection on routes (access only for authenticated users)
+    routes: ['/secret-data'], // routes which you want to protect
+    methods: ['get', 'post', 'put', 'delete', 'patch'] // methods for routes protection
+  })
+  .and(A) // Add new protective layer (A = function(req, next, cancel) {...})
+  .and(B)
+  .defend({ // Enable protection for some routes with two layers
+    routes: ['/a/b'], // Access will be present if (authenticated && A && B) is true
+    methods: ['get', 'post', 'put', 'delete', 'patch']
+  })
+  .defend({ // Defend may be called again and protect another routes with another methods
+    routes: ['/a/b/2'],
+    methods: 'get,post,put,delete,patch'
+  })
+  .clean()
+  .and(A, B) // Add new protective layer for some routes with several protective functions
+  .or(C) // Add protective function in previous layer
+  .defend({ // Access will be present if (authenticated && (A || B || C)) === true
+    route: ['/bcda/'],
+    method: 'get,post,put,delete,patch'
+  })
+  .and(D)
+  .defend({ // Access will be present if (authenticated && (A || B || C) && D) === true
+    routes: ['/bcda/e'],
+    methods: 'get,post,put,delete,patch'
+  })
+  .clean()
+  .or(A, B)
+  .defend({ // Access will be present if (authenticated || A || B) === true
+    routes: ['/auth_a_b'],
+    methods: 'get,post,put,delete,patch'
+  });
 
-simpleOAuth2Server.defend({ // Enable protection on routes (access only for authenticated users)
-        routes: ['/secret-data'], // routes which you want to protect
-        methods: ['get', 'post', 'put', 'delete', 'patch'] // methods for routes protection
-    })
-    .and(A) // Add new protective layer (A = function(req, next, cancel) {...})
-    .and(B)
-    .defend({ // Enable protection for some routes with two layers
-        routes: ['/a/b'], // Access will be present if (authenticated && A && B) is true
-        methods: ['get', 'post', 'put', 'delete', 'patch']
-    })
-    .defend({ // Defend may be called again and protect another routes with another methods
-        routes: ['/a/b/2'],
-        methods: 'get,post,put,delete,patch'
-    })
-    .clean() // Remove all previous levels of protection in chain
-    .and(B, C) // Add new protective layer for some routes with several protective functions
-    .or(D, A) // Add protective function in previous layer
-    .defend({ // Access will be present if (authenticated && (B || C || D || A)) === true
-        route: ['/bcda/'],
-        method: 'get,post,put,delete,patch'
-    })
-    .and(E)
-    .defend({ // Access will be present if (authenticated && (B || C || D || A) && E) === true
-        routes: ['/bcda/e'],
-        methods: 'get,post,put,delete,patch'
-    })
-    .clean()
-    .or(A, B)
-    .defend({ // Access will be present if (authenticated || A || B) === true
-        routes: ['/auth_a_b'],
-        methods: 'get,post,put,delete,patch'
-    });
+const customLayer = soas2.or(D).and(A, B).and(C).layersProtect;
 
-const customLayer = simpleOAuth2Server.and(A, B).and(C).or(D).layersProtect;
-app.post('/custom_protection', customLayer, (req, res) => {
-    res.send('OK!');
+app.get('/custom_protection', customLayer, (req, res) => {
+  res.send('OK!');
 });
 
 // On protect routes you can get token info from `req.token`
 app.all('/*', (req, res) => {
-    console.log(req.token);
-    res.send('Access is allow!');
+  console.log(req.token);
+  res.send('Access is allow!');
 })
 
 app.listen(3000, () => {
-    console.log('Server start');
+  console.log('Server start');
 });
 
 function A(req, next, cancel) {
-    if (true) {
-        console.log('A is success!');
-        next();
-    } else cancel('A is fail!');
+  if(true) {
+    console.log('A is success!');
+    next();
+  }
+  cancel('A is fail!');
 }
 
 function B(req, next, cancel) {
-    if (true) {
-        console.log('B is success!');
-        next();
-    } else cancel('B is fail!');
+  if(true) {
+    console.log('B is success!');
+    next();
+  }
+  cancel('B is fail!');
 }
 
 function C(req, next, cancel) {
-    if (true) {
-        console.log('C is success!');
-        next();
-    } else cancel('C is fail!');
+  if(true) {
+    console.log('C is success!');
+    next();
+  }
+  cancel('C is fail!');
 }
 
 function D(req, next, cancel) {
-    if (true) {
-        console.log('D is success!');
-        next();
-    } else cancel('D is fail!');
-}
-
-function E(req, next, cancel) {
-    if (true) {
-        console.log('E is success!');
-        next();
-    } else cancel('E is fail!');
+  if(true) {
+    console.log('D is success!');
+    next();
+  }
+  cancel('D is fail!');
 }
