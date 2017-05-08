@@ -18,7 +18,7 @@ class SimpleOAuth2Server {
   // Метод, срабатывающий при инициализации объекта класса
   constructor() {
     // Обнуление слоёв защиты
-    this.protection = this.clean().protection;
+    this.clean();
     // Параметры по-умолчанию
     this.defaultOptions = {
       // Время жизни access token
@@ -132,7 +132,7 @@ class SimpleOAuth2Server {
     if(typeof config.methods === 'string') {
       config.methods = config.methods.replace(/\s/g, '').split(',');
     }
-    this.__proto__ = Object.assign(this.__proto__, defaultOptions, config);
+    Object.assign(this, defaultOptions, config);
   }
   // Проверка критически важных параметров
   _fatalErrors() {
@@ -211,8 +211,7 @@ class SimpleOAuth2Server {
     return newObject;
   }
   get _copyObject() {
-    const newObject = new SimpleOAuth2Server;
-    newObject.__proto__ = Object.assign(newObject.__proto__, this.__proto__);
+    const newObject = Object.create(this);
     newObject.protection = copyArray(this.protection);
     return newObject;
   }
@@ -243,7 +242,7 @@ class SimpleOAuth2Server {
   }
 }
 
-module.exports = new SimpleOAuth2Server;
+module.exports = SimpleOAuth2Server;
 
 // Создание промиса из middleware функции
 function promiseMiddleware(req, aFunction) {
@@ -259,7 +258,7 @@ function promiseResult(promise) {
 }
 // Копирование массива (избегаем копирования указателя на массив)
 function copyArray(array) {
-  return array.map(element => element);
+  return array.map(subArray => subArray.slice());
 }
 // Вспомогательные функции, которые генерируются по строке или паре строк в массиве
 function shortFunction(param) {

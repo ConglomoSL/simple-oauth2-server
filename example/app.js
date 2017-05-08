@@ -1,6 +1,6 @@
-const express = require('express');
-const app = express();
-const soas2 = require('./../simpleOAuth2Server');
+const app = require('express')();
+const SimpleOAuth2Server = require('./../simpleOAuth2Server');
+const soas2 = new SimpleOAuth2Server;
 
 soas2.init({
     expressApp: app,
@@ -15,7 +15,7 @@ soas2.init({
     }
   })
   .defend({ // Enable protection on routes (access only for authenticated users)
-    routes: ['/secret-data'], // routes which you want to protect
+    routes: '/secret-data', // routes which you want to protect
     methods: ['get', 'post', 'put', 'delete', 'patch'] // methods for routes protection
   })
   .and(A) // Add new protective layer (A = function(req, next, cancel) {...})
@@ -25,37 +25,38 @@ soas2.init({
     methods: ['get', 'post', 'put', 'delete', 'patch']
   })
   .defend({ // Defend may be called again and protect another routes with another methods
-    routes: ['/a/b/2'],
+    routes: ['/a/b-2'],
     methods: 'get,post,put,delete,patch'
   })
   .clean()
   .and(A, B) // Add new protective layer for some routes with several protective functions
   .or(C) // Add protective function in previous layer
   .defend({ // Access will be present if (authenticated && (A || B || C)) === true
-    route: ['/bcda/'],
+    route: ['/abc/'],
     method: 'get,post,put,delete,patch'
   })
   .and(D)
   .defend({ // Access will be present if (authenticated && (A || B || C) && D) === true
-    routes: ['/bcda/e'],
+    routes: ['/abc/d'],
     methods: 'get,post,put,delete,patch'
   })
   .clean()
   .or(A, B)
   .defend({ // Access will be present if (authenticated || A || B) === true
-    routes: ['/auth_a_b'],
+    routes: ['/public'],
     methods: 'get,post,put,delete,patch'
-  });
+  })
+  .clean()
+  .defend();
 
 const customLayer = soas2.or(D).and(A, B).and(C).layersProtect;
 
 app.get('/custom_protection', customLayer, (req, res) => {
-  res.send('OK!');
+  res.send('custom_protection is OK!');
 });
 
 // On protect routes you can get token info from `req.token`
 app.all('/*', (req, res) => {
-  console.log(req.token);
   res.send('Access is allow!');
 })
 
