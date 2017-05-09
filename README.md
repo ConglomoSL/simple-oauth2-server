@@ -3,9 +3,8 @@
 # simple-oauth2-server
 ## Introdution
 Simple module for deploying oAuth2 server and enstablish several levels of protection on Express application.
-May be it help you to fast develope application.
 
-It use <a href="https://github.com/typicode/lowdb">`lowdb`</a> for saving tokens in session by default. And you can start developing now without creating data base. If you have DB and want to saving tokens in it you can write simple API for this module like:
+It uses <a href="https://github.com/typicode/lowdb">`lowdb`</a> for saving tokens in session by default. And you can start developing now without creating data base. If you have DB and want to saving tokens in it you can write simple API for this module like:
 - <a href="https://github.com/justerest/simple-oauth2-server/blob/master/api/lowdb.js">lowdb</a> (default)
 - <a href="https://github.com/justerest/simple-oauth2-server/blob/master/api/mysql.js">mySQL</a>
 

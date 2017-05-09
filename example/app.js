@@ -1,6 +1,5 @@
 const app = require('express')();
-const SimpleOAuth2Server = require('./../simpleOAuth2Server');
-const soas2 = new SimpleOAuth2Server;
+const soas2 = require('./../simpleOAuth2Server');
 
 soas2.init({
     expressApp: app,
@@ -9,13 +8,14 @@ soas2.init({
       if(username === 'login' && password === 'pass') {
         console.log('Authentication is success!');
         next();
+      } else {
+        console.log('Wrong password!');
+        cancel('Authentication is fail!');
       }
-      console.log('Wrong password!');
-      cancel('Authentication is fail!');
     }
   })
   .defend({ // Enable protection on routes (access only for authenticated users)
-    routes: '/secret-data', // routes which you want to protect
+    routes: ['/secret-data'], // routes which you want to protect
     methods: ['get', 'post', 'put', 'delete', 'patch'] // methods for routes protection
   })
   .and(A) // Add new protective layer (A = function(req, next, cancel) {...})
@@ -41,13 +41,15 @@ soas2.init({
     methods: 'get,post,put,delete,patch'
   })
   .clean()
-  .or(A, B)
+  .or(A)
   .defend({ // Access will be present if (authenticated || A || B) === true
     routes: ['/public'],
     methods: 'get,post,put,delete,patch'
-  })
-  .clean()
-  .defend();
+  });
+
+['get', 'post', 'put', 'delete', 'patch'].forEach(method =>
+  app[method]('/public', (req, res) => res.send('Public information!'))
+);
 
 const customLayer = soas2.or(D).and(A, B).and(C).layersProtect;
 
@@ -55,10 +57,10 @@ app.get('/custom_protection', customLayer, (req, res) => {
   res.send('custom_protection is OK!');
 });
 
-// On protect routes you can get token info from `req.token`
-app.all('/*', (req, res) => {
+soas2.defend();
+app.all('*', (req, res) => {
   res.send('Access is allow!');
-})
+});
 
 app.listen(3000, () => {
   console.log('Server start');

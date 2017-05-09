@@ -16,7 +16,11 @@ class SimpleOAuth2Server {
       tokensDB: new lowdbAPI
     };
   }
-  init(options) {
+  init(options, oldFormat) {
+    if(oldFormat && !options.expressApp) {
+      oldFormat.expressApp = options;
+      options = oldFormat;
+    }
     this._configuring(options);
     this._fatalErrors();
     this.tokensDB.connect();
@@ -53,7 +57,9 @@ class SimpleOAuth2Server {
   get layersProtect() {
     const _layers = copyArray(this.protection);
     return async(request, response, next) => {
-      const defCheckMsg = await promiseResult(promiseMiddleware(request, this._defaultProtect.bind(this)));
+      const defCheckMsg = await promiseResult(
+        promiseMiddleware(request, this._defaultProtect.bind(this))
+      );
       _layers[0][0] = defCheckMsg === 'success' ?
         Promise.resolve() :
         Promise.reject(defCheckMsg);
@@ -68,12 +74,15 @@ class SimpleOAuth2Server {
       mainCheckMsg === 'success' ?
         next() :
         response.status(401).send({
-          message: typeof mainCheckMsg[0] === 'string' ? mainCheckMsg[0] : "Ошибка авторизации!"
+          message: typeof mainCheckMsg[0] === 'string' ?
+            mainCheckMsg[0] : "Ошибка авторизации!"
         });
     };
   }
   authorizationHeader(request) {
-    return request.get('Authorization') ? request.get('Authorization').replace('Bearer ', '') : false;
+    return request.get('Authorization') ?
+      request.get('Authorization').replace('Bearer ', '') :
+      false;
   }
   get appSettings() {
     return express.Router()
@@ -122,12 +131,15 @@ class SimpleOAuth2Server {
       await this._checkRefreshToken.call(this, refresh_token) :
       await promiseResult(promiseMiddleware(request, this.checkPassword));
     if(refresh_token && authResult || authResult === 'success') {
-      const token = Object.assign(refresh_token ? authResult : this.tokenExtend(request), defaultToken);
+      const token = Object.assign(refresh_token ?
+        authResult :
+        this.tokenExtend(request), defaultToken);
       this.tokensDB.write(token);
       return response.send(token);
     }
     response.status(401).send({
-      "message": typeof authResult === 'string' ? authResult : "Ошибка аутентификации!"
+      "message": typeof authResult === 'string' ?
+        authResult : "Ошибка аутентификации!"
     });
   }
   get _revocationTokensRoute() {
@@ -140,28 +152,31 @@ class SimpleOAuth2Server {
   }
   get _loadRoutes() {
     const router = express.Router();
-    this.methods.forEach(method => {
-      router[method](this.routes, this.layersProtect);
-    });
+    this.methods.forEach(method => router[method](this.routes, this.layersProtect));
     return router;
   }
-  _layer(level, ...aFunctions) {
-    const newObject = this._copyObject;
+  _layer(level, ...functions) {
+    const newObject = this.copyObject;
     if(!Array.isArray(newObject.protection[level])) {
       newObject.protection[level] = [];
     }
-    aFunctions.forEach(aFunction => {
+    functions.forEach(aFunction => {
       newObject.protection[level]
-        .push(typeof aFunction === 'function' ? aFunction : shortFunction(aFunction));
+        .push(
+          typeof aFunction === 'function' ?
+          aFunction :
+          shortFunction(aFunction)
+        );
     });
     return newObject;
   }
-  get _copyObject() {
+  get copyObject() {
     const newObject = Object.create(this);
     newObject.protection = copyArray(this.protection);
     return newObject;
   }
   async _defaultProtect(req, next, cancel) {
+    if(req.token) next();
     const access_token = this.authorizationHeader(req);
     if(access_token) {
       const token = await this.tokensDB.find('access_token', access_token);
@@ -185,7 +200,7 @@ class SimpleOAuth2Server {
   }
 }
 
-module.exports = SimpleOAuth2Server;
+module.exports = new SimpleOAuth2Server;
 
 function promiseMiddleware(req, aFunction) {
   return new Promise((resolve, reject) => {
@@ -215,5 +230,6 @@ function shortFunction(param) {
 }
 
 function validateToken(token) {
-  return token && moment(token.expires_at, 'YYMMDDHHmmss').add(token.expires_in, 'seconds') >= moment();
+  return token &&
+    moment(token.expires_at, 'YYMMDDHHmmss').add(token.expires_in, 'seconds') >= moment();
 }
