@@ -1,13 +1,12 @@
 {
   "name": "simple-oauth2-server",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Simple module for deploying oAuth2 server with several levels of protection. Perfect work with ember-simple-auth",
-  "main": "./node.v6.app.js",
+  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "cd example/ && node app.js",
-    "build": "babel simpleOAuth2Server.js --minified -o ./node.v6.app.js",
-    "watch": "babel simpleOAuth2Server.js -w --minified -o ./node.v6.app.js"
+    "build": "babel ./versions/Node-v7/soas2.js --minified -o ./versions/Node-v6/soas2.js -e 'process.env.build = `true`'",
+    "watch": "babel ./versions/Node-v7/soas2.js -w --minified -o ./versions/Node-v6/soas2.js"
   },
   "keywords": [
     "oauth2",
@@ -20,16 +19,16 @@
   "license": "ISC",
   "dependencies": {
     "babel-polyfill": "^6.23.0",
-    "body-parser": "^1.17.1",
-    "express": "^4.15.2",
-    "lowdb": "^0.16.0",
+    "body-parser": "^1.17.2",
+    "express": "^4.15.3",
+    "lowdb": "^0.16.2",
     "moment": "^2.18.1",
     "promise-any": "^0.2.0",
     "uuid": "^3.0.1"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",
-    "babel-preset-env": "^1.3.3",
+    "babel-preset-env": "^1.5.1",
     "mysql": "^2.13.0"
   },
   "repository": {

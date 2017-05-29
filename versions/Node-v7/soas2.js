@@ -1,16 +1,20 @@
-require("babel-polyfill");
+if(!process.env.v7) require("babel-polyfill");
+
+const path = require('path');
 Promise.any = require('promise-any');
 const express = require('express');
 const bodyParser = require('body-parser');
 const uuid = require('uuid');
 const moment = require('moment');
-const lowdbAPI = require('./api/lowdb');
+const lowdbAPI = require(path.join(__dirname, '../../', 'api/lowdb'));
 
 class SimpleOAuth2Server {
   constructor() {
-    this.clean();
+    this.protection = [
+      ['default']
+    ];
     this.defaultOptions = {
-      expiredToken: 24 * 60 * 60,
+      expiredToken: 15 * 60,
       createTokenPath: '/token',
       revocationPath: '/tokenRevocation',
       tokensDB: new lowdbAPI
@@ -21,49 +25,41 @@ class SimpleOAuth2Server {
       oldFormat.expressApp = options;
       options = oldFormat;
     }
-    this._configuring(options);
-    this._fatalErrors();
+    this.__configuring(options);
+    this.__fatalErrors();
     this.tokensDB.connect();
     this.expressApp
       .use(this.appSettings)
-      .use(this._getTokenRoute)
-      .use(this._revocationTokensRoute);
+      .use(this.__getTokenRoute)
+      .use(this.__revocationTokensRoute);
     return this;
   }
   defend(options) {
-    this._configuring(options, {
+    this.__configuring(options, {
       routes: ['**'],
       methods: ['get', 'post', 'delete', 'put', 'patch']
     });
-    this.expressApp.use(this._loadRoutes);
+    this.expressApp.use(this.__loadRoutes);
     return this;
   }
-  and() {
+  layerAnd() {
     const level = this.protection.length;
-    return this._layer(level, ...arguments);
+    return this.__layer(level, ...arguments);
   }
-  add() {
-    return this.and(...arguments);
-  }
-  or() {
+  layerOr() {
     const level = this.protection.length - 1;
-    return this._layer(level, ...arguments);
+    return this.__layer(level, ...arguments);
   }
-  clean() {
-    this.protection = [];
-    this.protection.push(['default']);
-    return this;
-  }
-  get layersProtect() {
-    const _layers = copyArray(this.protection);
+  get protectiveLayers() {
+    const __layers = copyArray(this.protection);
     return async(request, response, next) => {
       const defCheckMsg = await promiseResult(
-        promiseMiddleware(request, this._defaultProtect.bind(this))
+        promiseMiddleware(request, this.__defaultProtect.bind(this))
       );
-      _layers[0][0] = defCheckMsg === 'success' ?
+      __layers[0][0] = defCheckMsg === 'success' ?
         Promise.resolve() :
         Promise.reject(defCheckMsg);
-      const thisLayers = _layers.map((layer, i) => {
+      const thisLayers = __layers.map((layer, i) => {
         const promises = layer.map((aFunction, j) => i + j ?
           promiseMiddleware(request, aFunction) :
           aFunction
@@ -73,10 +69,7 @@ class SimpleOAuth2Server {
       const mainCheckMsg = await promiseResult(Promise.all(thisLayers));
       mainCheckMsg === 'success' ?
         next() :
-        response.status(401).send({
-          message: typeof mainCheckMsg[0] === 'string' ?
-            mainCheckMsg[0] : "Ошибка авторизации!"
-        });
+        response401(response, mainCheckMsg[0]);
     };
   }
   authorizationHeader(request) {
@@ -94,7 +87,7 @@ class SimpleOAuth2Server {
         next();
       });
   }
-  _configuring(config = {}, defaultOptions = this.defaultOptions) {
+  __configuring(config = {}, defaultOptions = this.defaultOptions) {
     if(config.route) {
       config.routes = config.route;
     }
@@ -106,7 +99,7 @@ class SimpleOAuth2Server {
     }
     Object.assign(this, defaultOptions, config);
   }
-  _fatalErrors() {
+  __fatalErrors() {
     if(!this.expressApp) {
       throw new Error('Where is express application?');
       exit();
@@ -116,10 +109,10 @@ class SimpleOAuth2Server {
       exit();
     }
   }
-  get _getTokenRoute() {
-    return express.Router().post(this.createTokenPath, this._authentication.bind(this));
+  get __getTokenRoute() {
+    return express.Router().post(this.createTokenPath, this.__authentication.bind(this));
   }
-  async _authentication(request, response) {
+  async __authentication(request, response) {
     const defaultToken = {
       access_token: uuid(),
       refresh_token: uuid(),
@@ -128,45 +121,43 @@ class SimpleOAuth2Server {
     };
     const { refresh_token } = request.body;
     const authResult = refresh_token ?
-      await this._checkRefreshToken.call(this, refresh_token) :
+      await this.__checkRefreshToken.call(this, refresh_token) :
       await promiseResult(promiseMiddleware(request, this.checkPassword));
     if(refresh_token && authResult || authResult === 'success') {
-      const token = Object.assign(refresh_token ?
+      const token = Object.assign(
+        refresh_token ?
         authResult :
-        this.tokenExtend(request), defaultToken);
+        this.tokenExtend(request), defaultToken
+      );
       this.tokensDB.write(token);
       return response.send(token);
     }
-    response.status(401).send({
-      "message": typeof authResult === 'string' ?
-        authResult : "Ошибка аутентификации!"
-    });
+    response401(response, authResult, 'Ошибка аутентификации!');
   }
-  get _revocationTokensRoute() {
-    return express.Router().post(this.revocationPath, this._deleteTokens.bind(this));
+  get __revocationTokensRoute() {
+    return express.Router().post(this.revocationPath, this.__deleteTokens.bind(this));
   }
-  _deleteTokens(req, res) {
+  __deleteTokens(req, res) {
     const { token_type_hint, token } = req.body;
     this.tokensDB.remove(token_type_hint, token);
     res.send();
   }
-  get _loadRoutes() {
+  get __loadRoutes() {
     const router = express.Router();
-    this.methods.forEach(method => router[method](this.routes, this.layersProtect));
+    this.methods.forEach(method => router[method](this.routes, this.protectiveLayers));
     return router;
   }
-  _layer(level, ...functions) {
+  __layer(level, ...functions) {
     const newObject = this.copyObject;
     if(!Array.isArray(newObject.protection[level])) {
       newObject.protection[level] = [];
     }
     functions.forEach(aFunction => {
-      newObject.protection[level]
-        .push(
-          typeof aFunction === 'function' ?
-          aFunction :
-          shortFunction(aFunction)
-        );
+      newObject.protection[level].push(
+        typeof aFunction === 'function' ?
+        aFunction :
+        shortFunction(aFunction)
+      );
     });
     return newObject;
   }
@@ -175,7 +166,7 @@ class SimpleOAuth2Server {
     newObject.protection = copyArray(this.protection);
     return newObject;
   }
-  async _defaultProtect(req, next, cancel) {
+  async __defaultProtect(req, next, cancel) {
     if(req.token) next();
     const access_token = this.authorizationHeader(req);
     if(access_token) {
@@ -187,7 +178,7 @@ class SimpleOAuth2Server {
     }
     cancel('Попытка несанкционированного доступа!');
   }
-  async _checkRefreshToken(refresh_token) {
+  async __checkRefreshToken(refresh_token) {
     const token = await this.tokensDB.find('refresh_token', refresh_token);
     if(refresh_token && token && token.access_token.length) {
       this.tokensDB.remove('refresh_token', refresh_token);
@@ -232,4 +223,10 @@ function shortFunction(param) {
 function validateToken(token) {
   return token &&
     moment(token.expires_at, 'YYMMDDHHmmss').add(token.expires_in, 'seconds') >= moment();
+}
+
+function response401(res, errMsg, altMsg = 'Ошибка авторизации!') {
+  res.status(401).send({
+    'message': typeof errMsg === 'string' ? errMsg : altMsg
+  });
 }
