@@ -3,18 +3,21 @@ const low = require('lowdb');
 const fileAsyncStorage = require('lowdb/lib/storages/file-async');
 
 class lowdbAPI {
-  constructor(dirName = './secretLocalDataBase') {
+  constructor(dirName = './tokensDataBase') {
     this.path = dirName;
   }
+
   connect() {
     this.DB = startLowDB(this.path);
   }
+
   write(dataObj) {
     this.DB
       .get('tokens')
       .push(dataObj)
       .write();
   }
+
   remove(key, value) {
     this.DB
       .get('tokens')
@@ -23,6 +26,7 @@ class lowdbAPI {
       })
       .write();
   }
+
   find(key, value) {
     return this.DB
       .get('tokens')
@@ -31,6 +35,7 @@ class lowdbAPI {
       })
       .value();
   }
+
 }
 
 module.exports = lowdbAPI;

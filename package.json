@@ -1,11 +1,11 @@
 {
   "name": "simple-oauth2-server",
   "version": "2.0.0",
-  "description": "Simple module for deploying oAuth2 server with several levels of protection. Perfect work with ember-simple-auth",
+  "description": "Simple module for deploying OAuth2 server with several levels of protection",
   "main": "index.js",
   "scripts": {
     "start": "cd example/ && node app.js",
-    "build": "babel ./versions/Node-v7/soas2.js --minified -o ./versions/Node-v6/soas2.js -e 'process.env.build = `true`'",
+    "build": "babel ./versions/Node-v7/soas2.js --minified -o ./versions/Node-v6/soas2.js",
     "watch": "babel ./versions/Node-v7/soas2.js -w --minified -o ./versions/Node-v6/soas2.js"
   },
   "keywords": [
