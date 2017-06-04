@@ -21,13 +21,13 @@ const users = ['Администратор', 'Сотрудник', 'Administrato
 
 soas2.init({
     expressApp: app,
-    authentication(req, next, cancel) {
-      users.includes(req.body.username) ?
+    authentication(request, next, cancel) {
+      users.includes(request.body.username) ?
         next() :
         cancel('Authentication is fail!');
     },
-    tokenExtend(req) {
-      return { role: req.body.username };
+    tokenExtend(request) {
+      return { role: request.body.username };
     },
     expiredToken: 15
   })
@@ -45,9 +45,8 @@ You can watch an usage example on https://github.com/justerest/simple-oauth2-ser
 https://kscript.ru/auth/
 
 ## Methods
-### init(options)
-It start session.
-options (type: `object`):
+### init(`options`)
+Options (type: `object`):
 ```javascript
 {
   expressApp: /* required declare! Your express application object */,
@@ -64,8 +63,9 @@ options (type: `object`):
 }
 ```
 
-### defend(options)
+### defend(`options`)
 It establishes protection on routes.
+
 Options:
 - routes:
   - type: `array`
@@ -74,19 +74,19 @@ Options:
   - type: `array`
   - default: `['get', 'post', 'delete', 'put', 'patch']`
 
-### layerAnd(function(req, next, cancel), ...functions)
+### layerAnd(`function(request, next, cancel)`, `...functions`)
 Add new protective layer.
 
-### layerOr(function(req, next, cancel), ...functions)
+### layerOr(`function(request, next, cancel)`, `...functions`)
 Add new protective function in current layer.
 
 
 ## Token info
-On protected routes you can get token info from `req.token`
+On protected routes you can get token info from `request.token`
 ```javascript
-app.get('/secret-data', (req, res) => {
-    console.log(req.token);
-    res.send('secret data');
+app.get('/secret-data', (request, response) => {
+    console.log(request.token);
+    response.send('secret data');
 });
 ```
 
