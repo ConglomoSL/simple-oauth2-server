@@ -21,7 +21,6 @@ const users = ['Администратор', 'Сотрудник', 'Administrato
 
 soas2.init({
     expressApp: app,
-    // Your authentication function
     authentication(req, next, cancel) {
       users.includes(req.body.username) ?
         next() :
@@ -46,13 +45,12 @@ You can watch an usage example on https://github.com/justerest/simple-oauth2-ser
 https://kscript.ru/auth/
 
 ## Methods
-### init(app, options)
+### init(options)
 It start session.
-Params:
-- app (your express application object)
-- options (type: `object`):
+options (type: `object`):
 ```javascript
 {
+  expressApp: /* required declare! Your express application object */,
   authentication: /* required declare! Function for authentication */,
   expiredToken: 15 * 60, // token lifetime
   createTokenPath: '/token', // route where server gives tokens
@@ -97,7 +95,7 @@ app.get('/secret-data', (req, res) => {
 {
     access_token: uuid(),
     refresh_token: uuid(),
-    expires_in: this.tokenExpired,
+    expires_in: this.expiredToken,
     expires_at: moment()
 }
 

@@ -31,7 +31,7 @@ class SimpleOAuth2Server {
       options = oldFormat;
     }
     this.__configuring(options);
-    this.__fatalErrors();
+    this.__isFatalErrors();
     this.tokensDB.connect();
     this.expressApp
       .use(this.__appSettings)
@@ -76,13 +76,13 @@ class SimpleOAuth2Server {
     Object.assign(this, defaultOptions, config);
   }
 
-  __fatalErrors() {
+  __isFatalErrors() {
     if(!this.expressApp) {
       throw new Error('Where is express application?');
       exit();
     }
     if(!this.authentication) {
-      throw new Error('Function for checking user/password is undefined!');
+      throw new Error('Function for authentication is undefined!');
       exit();
     }
   }
@@ -146,10 +146,9 @@ class SimpleOAuth2Server {
   }
 
   async __checkRefreshToken(refresh_token) {
-    const args = ['refresh_token', refresh_token];
-    const token = await this.tokensDB.find(...args);
+    const token = await this.tokensDB.find('refresh_token', refresh_token);
     if(token) {
-      this.tokensDB.remove(...args);
+      this.tokensDB.remove('refresh_token', refresh_token);
       return moment(token.expires_at, DATE_FORMAT).add(1, 'week') > moment() ?
         token :
         false;
@@ -199,7 +198,8 @@ class SimpleOAuth2Server {
       .use((request, response, next) => {
         response.setHeader('Access-Control-Allow-Origin', '*');
         response.setHeader(
-          'Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH'
+          'Access-Control-Allow-Methods',
+          'GET, POST, PUT, DELETE, PATCH'
         );
         response.setHeader(
           'Access-Control-Allow-Headers',
